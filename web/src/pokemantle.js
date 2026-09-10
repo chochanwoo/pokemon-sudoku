@@ -15,6 +15,7 @@ import {
   ImageOff,
   RotateCw,
   Check,
+  ChevronDown,
 } from "lucide";
 import {
   createSimilarity,
@@ -47,6 +48,7 @@ const icons = {
   ImageOff,
   RotateCw,
   Check,
+  ChevronDown,
 };
 const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 const esc = (text) =>
@@ -74,6 +76,10 @@ let matches = [],
   latest = null,
   toastTimer;
 let storageWarning = false;
+const RANKING_PAGE_SIZE = 20;
+let resultsView = "history",
+  rankingLimit = RANKING_PAGE_SIZE,
+  wasEnded = false;
 const stored = (key) => {
   try {
     return localStorage.getItem(`pokemantle:${key}`);
@@ -133,9 +139,17 @@ function mount() {
         <div id="first-guesses" class="pm-starters"></div>
       </section>
       <div id="pm-toast" role="status" aria-live="polite"></div>
-      <section class="pm-history" aria-labelledby="history-title"><div class="pm-history-heading"><h2 id="history-title">추측 기록 <span id="guess-count">0</span></h2><label class="pm-sort"><span class="sr-only">기록 정렬</span><select id="guess-sort"><option value="score">유사도순</option><option value="recent">최신순</option></select></label></div>
+      <div id="result-tabs" class="pm-result-tabs" role="tablist" aria-label="결과 보기" hidden><button id="ranking-tab" role="tab" aria-controls="ranking-panel" aria-selected="false" tabindex="-1" data-results-view="ranking">유사도 순위</button><button id="history-tab" role="tab" aria-controls="history-panel" aria-selected="true" data-results-view="history">내 추측</button></div>
+      <section id="history-panel" class="pm-history" aria-labelledby="history-title"><div class="pm-history-heading"><h2 id="history-title">추측 기록 <span id="guess-count">0</span></h2><label class="pm-sort"><span class="sr-only">기록 정렬</span><select id="guess-sort"><option value="score">유사도순</option><option value="recent">최신순</option></select></label></div>
         <div class="pm-table-wrap"><table class="pm-table"><thead><tr><th scope="col">#</th><th scope="col">포켓몬</th><th scope="col">유사도</th><th scope="col">순위</th></tr></thead><tbody id="guess-history"></tbody></table></div>
         <div id="empty-history" class="pm-empty">${icon("scan-search")}<span>아직 추측한 포켓몬이 없어요.</span></div>
+      </section>
+      <section id="ranking-panel" class="pm-history" role="tabpanel" aria-labelledby="ranking-tab" hidden>
+        <div class="pm-history-heading"><h2>정답 유사도 순위</h2><span id="ranking-total" class="pm-ranking-count"></span></div>
+        <label class="pm-search pm-ranking-search">${icon("search")}<input id="ranking-search" type="search" aria-label="순위에서 포켓몬 검색" placeholder="포켓몬 검색" autocomplete="off" spellcheck="false" /><button type="button" class="icon-button" id="clear-ranking" data-action="clear-ranking" aria-label="순위 검색 지우기" hidden>${icon("x")}</button></label>
+        <div class="pm-table-wrap"><table class="pm-table pm-ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">포켓몬</th><th scope="col">유사도</th></tr></thead><tbody id="similarity-ranking"></tbody></table></div>
+        <div id="ranking-empty" class="pm-empty" hidden>일치하는 포켓몬이 없어요.</div>
+        <div class="pm-ranking-footer"><span id="ranking-count" class="pm-ranking-count" role="status"></span><button class="text-button" id="more-ranking" data-action="more-ranking">${icon("chevron-down")}더 보기</button></div>
       </section>
       <div class="pm-game-actions"><div><button class="text-button pm-hint" data-action="hint">${icon("lightbulb")}<span id="hint-label">힌트 0/3</span></button><button class="text-button" data-action="give-up">${icon("flag")}포기</button></div><span id="next-puzzle" class="pm-next"></span></div>
       <footer class="footer pm-footer"><span>포켓몬틀 <span class="footer-dot">·</span> 비공식 팬 게임</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">데이터 · PokéAPI ${icon("arrow-right")}</a></footer>
@@ -170,6 +184,28 @@ function mount() {
     sort = event.target.value;
     renderHistory();
   });
+  document.querySelector("#ranking-search").addEventListener("input", () => {
+    rankingLimit = RANKING_PAGE_SIZE;
+    renderRankings();
+  });
+  document
+    .querySelector("#result-tabs")
+    .addEventListener("keydown", (event) => {
+      if (!event.target.matches("[role=tab]")) return;
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+        return;
+      event.preventDefault();
+      const view =
+        event.key === "Home"
+          ? "ranking"
+          : event.key === "End"
+            ? "history"
+            : resultsView === "ranking"
+              ? "history"
+              : "ranking";
+      setResultsView(view);
+      document.querySelector(`#${view}-tab`).focus();
+    });
   document.addEventListener("click", onClick);
   document.addEventListener("focusin", (event) => {
     if (!event.target.closest("#guess-form")) closeSuggestions();
@@ -190,6 +226,10 @@ function start(day) {
   target = dailyTarget(data, day);
   ranked = game.ranking(target);
   rankById = new Map(ranked.map((row) => [row.id, row]));
+  resultsView = "history";
+  rankingLimit = RANKING_PAGE_SIZE;
+  wasEnded = false;
+  document.querySelector("#ranking-search").value = "";
   latest = null;
   document.querySelector("#guess-input").value = "";
   document.querySelector("#pm-title").textContent =
@@ -294,6 +334,8 @@ function guess(id, hint = false) {
 }
 
 function render() {
+  if (ended() && !wasEnded) resultsView = "ranking";
+  wasEnded = ended();
   const best = ranked.find((row) => round.guesses.some((g) => g.id === row.id));
   document.querySelector("#attempts").textContent = round.guesses.length;
   document.querySelector("#best-score").textContent = best
@@ -326,6 +368,76 @@ function render() {
   document.querySelector("#save-warning").hidden = !storageWarning;
   document.querySelector("#clear-guess").hidden = true;
   renderHistory();
+  renderRankings();
+  renderResultsView();
+}
+
+function setResultsView(view) {
+  if (!ended() || !["history", "ranking"].includes(view)) return;
+  resultsView = view;
+  renderResultsView();
+}
+
+function renderResultsView() {
+  const finished = ended();
+  document.querySelector("#result-tabs").hidden = !finished;
+  document.querySelector("#ranking-panel").hidden =
+    !finished || resultsView !== "ranking";
+  const history = document.querySelector("#history-panel");
+  history.hidden = finished && resultsView !== "history";
+  if (finished) history.setAttribute("role", "tabpanel");
+  else history.removeAttribute("role");
+  history.setAttribute(
+    "aria-labelledby",
+    finished ? "history-tab" : "history-title",
+  );
+  for (const view of ["ranking", "history"]) {
+    const tab = document.querySelector(`#${view}-tab`);
+    tab.setAttribute("aria-selected", resultsView === view);
+    tab.tabIndex = resultsView === view ? 0 : -1;
+  }
+}
+
+function renderRankings() {
+  const body = document.querySelector("#similarity-ranking");
+  if (!ended()) {
+    body.replaceChildren();
+    document.querySelector("#ranking-total").textContent = "";
+    document.querySelector("#ranking-count").textContent = "";
+    return;
+  }
+  const query = document.querySelector("#ranking-search").value.trim();
+  const matching = query
+    ? new Set(searchForms(data.pokemon, query).map((p) => p.id))
+    : null;
+  const rows = matching ? ranked.filter((row) => matching.has(row.id)) : ranked;
+  const visible = rows.slice(0, rankingLimit);
+  const guesses = new Map(round.guesses.map((guess) => [guess.id, guess]));
+  body.innerHTML = visible
+    .map((row) => {
+      const p = game.byId.get(row.id);
+      const warmth =
+        row.score >= 70 ? "hot" : row.score >= 40 ? "warm" : "cool";
+      const label =
+        p.id === target
+          ? "정답"
+          : guesses.has(p.id)
+            ? guesses.get(p.id).hint
+              ? "내 추측 · 힌트"
+              : "내 추측"
+            : "";
+      return `<tr data-ranking="${p.id}" class="${p.id === target ? "pm-ranking-answer" : ""}"><td class="pm-rank">${row.rank.toLocaleString("ko-KR")}위</td><th scope="row"><div class="pm-pokemon">${sprite(p)}<span>${esc(p.name)}<small class="pm-ranking-meta">${badges(p)}${label ? `<span>${label}</span>` : ""}</small></span></div></th><td><div class="pm-score ${warmth}"><strong>${row.score.toFixed(2)}</strong><span class="pm-score-track"><span style="width:${row.score}%"></span></span></div></td></tr>`;
+    })
+    .join("");
+  document.querySelector("#clear-ranking").hidden = !query;
+  document.querySelector("#ranking-empty").hidden = rows.length > 0;
+  document.querySelector("#ranking-total").textContent =
+    `${rows.length.toLocaleString("ko-KR")}개 모습`;
+  document.querySelector("#ranking-count").textContent =
+    `${visible.length.toLocaleString("ko-KR")} / ${rows.length.toLocaleString("ko-KR")}`;
+  document.querySelector("#more-ranking").hidden =
+    visible.length >= rows.length;
+  refreshIcons();
 }
 
 function renderHistory() {
@@ -414,6 +526,11 @@ async function share() {
 }
 
 function onClick(event) {
+  const resultTab = event.target.closest("[data-results-view]");
+  if (resultTab) {
+    setResultsView(resultTab.dataset.resultsView);
+    return;
+  }
   const guessOption = event.target.closest("[data-guess]");
   if (guessOption) {
     guess(Number(guessOption.dataset.guess));
@@ -423,6 +540,18 @@ function onClick(event) {
   const button = event.target.closest("[data-action]");
   if (!button) return;
   switch (button.dataset.action) {
+    case "more-ranking":
+      if (ended()) {
+        rankingLimit += RANKING_PAGE_SIZE;
+        renderRankings();
+      }
+      break;
+    case "clear-ranking":
+      document.querySelector("#ranking-search").value = "";
+      rankingLimit = RANKING_PAGE_SIZE;
+      renderRankings();
+      document.querySelector("#ranking-search").focus();
+      break;
     case "clear":
       document.querySelector("#guess-input").value = "";
       renderSuggestions();

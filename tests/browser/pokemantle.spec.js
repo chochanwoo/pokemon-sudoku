@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   dailyTarget,
   createSimilarity,
+  searchForms,
 } from "../../web/src/similarity-engine.js";
 
 const data = JSON.parse(
@@ -272,7 +273,7 @@ test("touch selection preserves the exact regional form and feedback stays outsi
     await page.locator('#guess-options [data-guess="37"]').tap();
     await expect(page.locator("#attempts")).toHaveText("1");
     const message = await page.locator("#pm-toast").boundingBox();
-    const history = await page.locator(".pm-history").boundingBox();
+    const history = await page.locator("#history-panel").boundingBox();
     expect(message.y + message.height).toBeLessThanOrEqual(history.y);
     await input.fill("알로라 식스테일");
     await page.locator(`#guess-options [data-guess="${regionalId}"]`).tap();
@@ -284,4 +285,171 @@ test("touch selection preserves the exact regional form and feedback stays outsi
   } finally {
     await context.close();
   }
+});
+
+async function expectRanking(page, rows) {
+  await expect(page.locator("#similarity-ranking tr")).toHaveCount(rows.length);
+  const actual = await page
+    .locator("#similarity-ranking tr")
+    .evaluateAll((elements) =>
+      elements.map((row) => ({
+        id: Number(row.dataset.ranking),
+        rank: row.querySelector(".pm-rank").textContent,
+        score: row.querySelector(".pm-score strong").textContent,
+      })),
+    );
+  expect(actual).toEqual(
+    rows.map((row) => ({
+      id: row.id,
+      rank: `${row.rank.toLocaleString("ko-KR")}위`,
+      score: row.score.toFixed(2),
+    })),
+  );
+}
+
+test("winning unlocks ranked results with paging, search and accessible history tabs", async ({
+  page,
+}) => {
+  await page.goto(path);
+  await expect(page.locator("#result-tabs")).toBeHidden();
+  await expect(page.locator("#ranking-panel")).toBeHidden();
+  await expectRanking(page, []);
+  await guess(page, "vulpix");
+  await expectRanking(page, []);
+  await guess(page, "vulpix-alola");
+  const ranking = game.ranking(regionalId);
+  await expect(page.getByRole("tab", { name: "유사도 순위" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator("#ranking-panel")).toBeVisible();
+  await expect(page.locator("#history-panel")).toBeHidden();
+  await expectRanking(page, ranking.slice(0, 20));
+  await expect(
+    page.locator(`#similarity-ranking [data-ranking="${regionalId}"]`),
+  ).toContainText("정답");
+  await page.locator("#more-ranking").click();
+  await expectRanking(page, ranking.slice(0, 40));
+
+  await page.getByRole("tab", { name: "내 추측", exact: true }).click();
+  await expect(page.locator("#history-panel")).toBeVisible();
+  await expect(page.locator("#guess-history tr")).toHaveCount(2);
+  await expect(page.locator("#ranking-panel")).toBeHidden();
+  await page.locator("#history-tab").press("ArrowLeft");
+  await expect(page.locator("#ranking-tab")).toBeFocused();
+  await expect(page.locator("#ranking-panel")).toBeVisible();
+  await expectRanking(page, ranking.slice(0, 40));
+  await page.locator("#ranking-tab").press("End");
+  await expect(page.locator("#history-tab")).toBeFocused();
+  await page.locator("#history-tab").press("Home");
+  await expect(page.locator("#ranking-tab")).toBeFocused();
+
+  const search = page.getByRole("searchbox", { name: "순위에서 포켓몬 검색" });
+  await search.fill("식스테일");
+  await expect(page.locator('[data-ranking="37"]')).toContainText("내 추측");
+  await search.fill("리자몽");
+  const matched = new Set(searchForms(data.pokemon, "리자몽").map((p) => p.id));
+  await expectRanking(
+    page,
+    ranking.filter((row) => matched.has(row.id)),
+  );
+  await expect(page.locator("#more-ranking")).toBeHidden();
+  await search.fill("없는포켓몬");
+  await expectRanking(page, []);
+  await expect(page.locator("#ranking-empty")).toBeVisible();
+  await page.getByRole("button", { name: "순위 검색 지우기" }).click();
+  await expect(search).toBeFocused();
+  await expectRanking(page, ranking.slice(0, 20));
+  await page.reload();
+  await expect(page.locator("#ranking-panel")).toBeVisible();
+  await expectRanking(page, ranking.slice(0, 20));
+  await expect(page.locator("#attempts")).toHaveText("2");
+});
+
+test("giving up reveals the same rankings and preserves global ranks including ties", async ({
+  page,
+}) => {
+  await page.goto(path);
+  await page.getByRole("button", { name: "포기", exact: true }).click();
+  await page.getByRole("button", { name: "닫기", exact: true }).click();
+  await expect(page.locator("#result-tabs")).toBeHidden();
+  await expectRanking(page, []);
+  await page.getByRole("button", { name: "포기", exact: true }).click();
+  await page.getByRole("button", { name: "정답 공개", exact: true }).click();
+  await expect(page.locator("#ranking-panel")).toBeVisible();
+  const ranking = game.ranking(regionalId);
+  await expectRanking(page, ranking.slice(0, 20));
+  const search = page.getByRole("searchbox", { name: "순위에서 포켓몬 검색" });
+  const last = ranking.at(-1);
+  await search.fill(game.byId.get(last.id).key);
+  await expect(page.locator(`[data-ranking="${last.id}"] .pm-rank`)).toHaveText(
+    `${last.rank.toLocaleString("ko-KR")}위`,
+  );
+  const tied = ranking.find(
+    (row, i) => i > 0 && row.rank === ranking[i - 1].rank,
+  );
+  expect(tied).toBeTruthy();
+  await search.fill(game.byId.get(tied.id).key);
+  await expect(page.locator(`[data-ranking="${tied.id}"] .pm-rank`)).toHaveText(
+    `${tied.rank.toLocaleString("ko-KR")}위`,
+  );
+  await page.getByRole("tab", { name: "내 추측", exact: true }).click();
+  await expect(page.locator("#empty-history")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("#ranking-panel")).toBeVisible();
+  await expectRanking(page, ranking.slice(0, 20));
+  await expect(page.locator("#attempts")).toHaveText("0");
+});
+
+test("revealed rankings fit mobile and desktop, render images, and clear for a new day", async ({
+  page,
+}) => {
+  await page.goto(path);
+  await guess(page, "tauros-paldea-aqua-breed");
+  await guess(page, "urshifu-rapid-strike-gmax");
+  await guess(page, "vulpix-alola");
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
+    for (const query of ["", "우라오스", "팔데아"]) {
+      await page.locator("#ranking-search").fill(query);
+      const fit = await page
+        .locator("#ranking-panel")
+        .evaluate(async (panel) => {
+          const images = [...panel.querySelectorAll("img")];
+          await Promise.all(images.map((img) => img.decode()));
+          return {
+            overflow: document.documentElement.scrollWidth > innerWidth,
+            images: images.every((img) => img.naturalWidth > 0),
+            cells: [...panel.querySelectorAll("tbody td, tbody th")].every(
+              (cell) => cell.scrollWidth <= cell.clientWidth + 1,
+            ),
+            names: [...panel.querySelectorAll(".pm-pokemon > span")].every(
+              (name) => {
+                const box = name.getBoundingClientRect();
+                const cell = name.closest("th").getBoundingClientRect();
+                return box.right <= cell.right && box.bottom <= cell.bottom;
+              },
+            ),
+          };
+        });
+      expect(fit).toEqual({
+        overflow: false,
+        images: true,
+        cells: true,
+        names: true,
+      });
+      if (query !== "팔데아") {
+        await page.screenshot({
+          path: `.preview/pokemantle-ranking-${width}${query ? "-long" : ""}.png`,
+          fullPage: true,
+        });
+      }
+    }
+  }
+  await page.getByRole("button", { name: "오늘의 문제", exact: true }).click();
+  await expect(page.locator("#result-tabs")).toBeHidden();
+  await expect(page.locator("#ranking-panel")).toBeHidden();
+  await expectRanking(page, []);
+  await expect(page.locator("#history-panel")).toBeVisible();
+  await expect(page.locator("#attempts")).toHaveText("0");
 });
