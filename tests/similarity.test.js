@@ -153,17 +153,41 @@ test("legendary clues lead toward Ultra Necrozma without sacrificing ordinary ev
   );
 });
 
-test("proximity labels use global competition ranks instead of absolute scores", () => {
-  assert.deepEqual(proximityFor(1, 1579), { tone: "hot", label: "정답" });
-  assert.deepEqual(proximityFor(8, 1579), {
+test("proximity labels require both global rank and minimum score, including exact boundaries", () => {
+  assert.deepEqual(proximityFor(1, 1579, 100), { tone: "hot", label: "정답" });
+  assert.deepEqual(proximityFor(8, 1579, 45.15), {
     tone: "hot",
     label: "매우 가까움",
   });
-  assert.equal(proximityFor(15, 1579).tone, "hot");
-  assert.equal(proximityFor(16, 1579).tone, "warm");
-  assert.equal(proximityFor(157, 1579).tone, "warm");
-  assert.equal(proximityFor(158, 1579).tone, "cool");
-  assert.equal(proximityFor(1579, 1579).tone, "cool");
+  assert.deepEqual(proximityFor(8, 1579, 35), {
+    tone: "warm",
+    label: "가까움",
+  });
+  assert.deepEqual(proximityFor(8, 1579, 24), {
+    tone: "cool",
+    label: "거리가 있음",
+  });
+  for (const [rank, score, tone] of [
+    [15, 40, "hot"],
+    [15, 39.99, "warm"],
+    [16, 99.9, "warm"],
+    [157, 25, "warm"],
+    [157, 24.99, "cool"],
+    [158, 99.9, "cool"],
+    [8, 25, "warm"],
+    [8, 24.99, "cool"],
+    [2, 0, "cool"],
+    [1579, 99.9, "cool"],
+  ])
+    assert.equal(
+      proximityFor(rank, 1579, score).tone,
+      tone,
+      `${rank} / ${score}`,
+    );
+  assert.equal(proximityFor(2, 200, 40).tone, "hot");
+  assert.equal(proximityFor(3, 200, 40).tone, "warm");
+  assert.equal(proximityFor(20, 200, 25).tone, "warm");
+  assert.equal(proximityFor(21, 200, 25).tone, "cool");
 });
 
 test("daily targets cover every form, remain deterministic and use Korean midnight", () => {

@@ -62,18 +62,6 @@ const esc = (text) =>
   );
 const tool = (action, label, glyph) =>
   `<button class="icon-button" data-action="${action}" aria-label="${label}" data-tooltip="${label}">${icon(glyph)}</button>`;
-const weightLabels = {
-  types: "타입",
-  evolution: "진화·폼 관계",
-  classification: "전설·환상 분류",
-  motifs: "설정·모티브",
-  stats: "종족값",
-  moves: "습득 기술",
-  description: "도감 설명",
-  abilities: "특성",
-  eggGroups: "알그룹",
-  body: "체격",
-};
 const app = document.querySelector("#app");
 const asset = (path) => `${import.meta.env.BASE_URL}${path}`;
 const typeImages = import.meta.glob("./assets/types/*.svg", {
@@ -126,7 +114,7 @@ function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.8 } });
 }
 function scoreMarkup(row) {
-  const proximity = proximityFor(row.rank, data.pokemon.length);
+  const proximity = proximityFor(row.rank, data.pokemon.length, row.score);
   return `<div class="pm-score ${proximity.tone}"><strong>${row.score.toFixed(2)}</strong><small class="pm-proximity">${proximity.label}</small><span class="pm-score-track"><span style="width:${row.score}%"></span></span></div>`;
 }
 function toast(text) {
@@ -342,7 +330,7 @@ function guess(id, hint = false) {
   toast(
     isWon(round, target)
       ? "정답이에요!"
-      : `${proximityFor(row.rank, data.pokemon.length).label} · 유사도 ${row.score.toFixed(2)} · ${row.rank}위`,
+      : `${proximityFor(row.rank, data.pokemon.length, row.score).label} · 유사도 ${row.score.toFixed(2)} · ${row.rank}위`,
   );
   if (ended()) {
     saveRecord();
@@ -608,13 +596,7 @@ function onClick(event) {
     case "help":
       dialog(
         "포켓몬틀 규칙",
-        `<ul class="rules"><li>하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 알로라·가라르·히스이·팔데아, 메가진화와 외형 차이도 각각 별개의 정답입니다.</li><li>유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.</li><li>${Object.entries(
-          data.weights,
-        )
-          .map(([key, weight]) => `${esc(weightLabels[key] || key)} ${weight}%`)
-          .join(
-            ", ",
-          )}를 반영합니다. 없는 데이터는 비교에서 제외합니다.</li><li>힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.</li><li>한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.</li></ul>`,
+        `<ul class="rules"><li>하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 알로라·가라르·히스이·팔데아, 메가진화와 외형 차이도 각각 별개의 정답입니다.</li><li>유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.</li><li>힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.</li><li>한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.</li></ul>`,
       );
       break;
     case "stats": {

@@ -487,15 +487,28 @@ test("new weights rescore existing guesses without changing today's answer, and 
   await expect(page.locator("#answer-panel")).toBeHidden();
   await expect(page.locator("#ranking-panel")).toBeHidden();
   await page.getByRole("button", { name: "게임 규칙" }).click();
-  for (const weight of [
-    "타입 25%",
-    "진화·폼 관계 20%",
-    "전설·환상 분류 15%",
-    "설정·모티브 10%",
-    "종족값 10%",
-    "도감 설명 5%",
+  const help = page.locator("#pm-dialog-body");
+  await expect(help.getByRole("listitem")).toHaveCount(4);
+  for (const rule of [
+    "정확한 모습",
+    "100점, 1위",
+    "최대 3번",
+    "한국 시간 자정",
   ])
-    await expect(page.locator("#pm-dialog-body")).toContainText(weight);
+    await expect(help).toContainText(rule);
+  await expect(help).not.toContainText(
+    /%|가중치|종족값|도감 설명|모티브|습득 기술|알그룹|체격/,
+  );
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
+    const box = await page.locator("#pm-dialog").boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    await page.screenshot({
+      path: `.preview/pokemantle-help-${width}.png`,
+      fullPage: true,
+    });
+  }
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
@@ -524,4 +537,57 @@ test("new weights rescore existing guesses without changing today's answer, and 
   await expect(page.locator("#answer-title")).toHaveText(
     "네크로즈마 (울트라네크로즈마)",
   );
+});
+
+test("score floors consistently downgrade low-scoring high ranks in history, feedback and revealed rankings", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const cases = [
+    { target: "nidoqueen", guess: "nidorino", label: "가까움", tone: "warm" },
+    {
+      target: "necrozma-ultra",
+      guess: "metagross",
+      label: "거리가 있음",
+      tone: "cool",
+    },
+  ];
+  for (const c of cases) {
+    const target = data.pokemon.find((p) => p.key === c.target).id;
+    const id = data.pokemon.find((p) => p.key === c.guess).id;
+    const row = game.ranking(target).find((row) => row.id === id);
+    expect(row.rank).toBeLessThanOrEqual(c.tone === "warm" ? 15 : 157);
+    expect(row.score).toBeLessThan(c.tone === "warm" ? 40 : 25);
+    await page.goto(`./pokemantle.html?date=${dateFor(target)}`);
+    await guess(page, c.guess);
+    await expect(
+      page.locator(`[data-result="${id}"] .pm-proximity`),
+    ).toHaveText(c.label);
+    await expect(page.locator(`[data-result="${id}"] .pm-score`)).toHaveClass(
+      `pm-score ${c.tone}`,
+    );
+    await expect(page.locator("#pm-toast")).toHaveText(
+      `${c.label} · 유사도 ${row.score.toFixed(2)} · ${row.rank}위`,
+    );
+    await page.screenshot({
+      path: `.preview/pokemantle-score-floor-${c.guess}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "포기", exact: true }).click();
+    await page.getByRole("button", { name: "정답 공개", exact: true }).click();
+    await page
+      .getByRole("searchbox", { name: "순위에서 포켓몬 검색" })
+      .fill(c.guess);
+    await expect(
+      page.locator(`[data-ranking="${id}"] .pm-proximity`),
+    ).toHaveText(c.label);
+    await expect(page.locator(`[data-ranking="${id}"] .pm-score`)).toHaveClass(
+      `pm-score ${c.tone}`,
+    );
+    await page.reload();
+    await page.getByRole("tab", { name: "내 추측", exact: true }).click();
+    await expect(
+      page.locator(`[data-result="${id}"] .pm-proximity`),
+    ).toHaveText(c.label);
+  }
 });

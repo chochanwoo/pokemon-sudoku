@@ -3,10 +3,12 @@ import { dayKey, initials } from "./engine.js";
 export { dayKey };
 export const MAX_HINTS = 3;
 
-export function proximityFor(rank, total) {
+export function proximityFor(rank, total, score) {
   if (rank === 1) return { tone: "hot", label: "정답" };
-  if (rank / total <= 0.01) return { tone: "hot", label: "매우 가까움" };
-  if (rank / total <= 0.1) return { tone: "warm", label: "가까움" };
+  if (rank / total <= 0.01 && score >= 40)
+    return { tone: "hot", label: "매우 가까움" };
+  if (rank / total <= 0.1 && score >= 25)
+    return { tone: "warm", label: "가까움" };
   return { tone: "cool", label: "거리가 있음" };
 }
 
