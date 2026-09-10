@@ -1,4 +1,4 @@
-export const GAME_VERSION = 1;
+export const GAME_VERSION = 2;
 export const DIFFICULTIES = ["easy", "normal", "hard"];
 
 export function hash(text) {
@@ -87,10 +87,14 @@ export function getCandidateTypes(puzzle, entries, byId, index) {
     ),
   );
   const available = new Set(puzzle.types.filter((type) => !used.has(type)));
-  // Only suggest types belonging to an actual, locally legal Pokemon pair.
+  // Candidate pairs also need an unused Pokemon somewhere in the catalog.
   const candidates = new Set(
     [...byId.values()]
-      .filter((p) => p.types.every((type) => available.has(type)))
+      .filter(
+        (p) =>
+          !isPokemonUsed(entries, index, p.id) &&
+          p.types.every((type) => available.has(type)),
+      )
       .flatMap((p) => p.types),
   );
   return puzzle.types.filter((type) => candidates.has(type));
@@ -126,10 +130,12 @@ export function makePuzzle(
     const key = pairKey(p.types);
     pool.set(key, [...(pool.get(key) || []), p.id]);
   }
+  for (const [key, choices] of pool) pool.set(key, shuffle(choices, rng));
   const representatives = solution.map((pair) => {
     const choices = pool.get(pairKey(pair));
-    if (!choices?.length) throw new Error("Missing Pokemon type pair");
-    return choices[Math.floor(rng() * choices.length)];
+    if (!choices?.length)
+      throw new Error("Not enough distinct Pokemon for this puzzle");
+    return choices.pop();
   });
   return {
     id: `${base.id}-${hash(seed)}-${difficulty}`,
@@ -162,7 +168,7 @@ export function newState(puzzle) {
 }
 
 export function findConflicts(puzzle, entries, byId) {
-  const conflicts = new Set();
+  const conflicts = duplicatePokemonCells(entries);
   for (const unit of getUnits(puzzle)) {
     const seen = new Map();
     for (const index of unit) {
@@ -179,10 +185,34 @@ export function findConflicts(puzzle, entries, byId) {
   return conflicts;
 }
 
+export function isPokemonUsed(entries, index, id) {
+  return id !== null && entries.some((entry, i) => i !== index && entry === id);
+}
+
+function duplicatePokemonCells(entries) {
+  const seen = new Map(),
+    duplicates = new Set();
+  entries.forEach((id, index) => {
+    if (id === null) return;
+    if (seen.has(id)) {
+      duplicates.add(seen.get(id));
+      duplicates.add(index);
+    } else seen.set(id, index);
+  });
+  return duplicates;
+}
+
 export function canPlace(puzzle, entries, byId, index, id) {
-  if (index < 0 || puzzle.givens[index]) return false;
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= entries.length ||
+    puzzle.givens[index]
+  )
+    return false;
   const p = byId.get(id);
   if (!p || !p.types.every((t) => puzzle.types.includes(t))) return false;
+  if (isPokemonUsed(entries, index, id)) return false;
   return [...getPeers(puzzle, index)].every(
     (i) => !byId.get(entries[i])?.types.some((t) => p.types.includes(t)),
   );
@@ -198,7 +228,12 @@ function remember(state) {
 }
 
 export function placePokemon(puzzle, state, byId, index, id) {
-  if (index < 0 || index >= state.entries.length || puzzle.givens[index])
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= state.entries.length ||
+    puzzle.givens[index]
+  )
     return false;
   if (
     id !== null &&
@@ -206,12 +241,18 @@ export function placePokemon(puzzle, state, byId, index, id) {
       !byId.get(id).types.every((t) => puzzle.types.includes(t)))
   )
     return false;
+  if (isPokemonUsed(state.entries, index, id)) return false;
   if (
     state.entries[index] === id &&
     (id !== null || state.notes[index].length === 0)
   )
     return false;
   remember(state);
+  writeEntry(puzzle, state, byId, index, id);
+  return true;
+}
+
+function writeEntry(puzzle, state, byId, index, id) {
   state.entries[index] = id;
   state.notes[index] = [];
   if (id !== null) {
@@ -222,7 +263,41 @@ export function placePokemon(puzzle, state, byId, index, id) {
     }
     state.moves++;
   }
-  return true;
+}
+
+export function applyHint(puzzle, state, byId, index) {
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= state.entries.length ||
+    puzzle.givens[index]
+  )
+    return null;
+  const key = pairKey(puzzle.solution[index]);
+  if (pairKey(byId.get(state.entries[index])?.types || []) === key) return null;
+  const choices = [...byId.values()].filter((p) => pairKey(p.types) === key);
+  const preferred = choices.find((p) => p.id === puzzle.representatives[index]);
+  const pick = [preferred, ...choices].find(
+    (p) => p && !isPokemonUsed(state.entries, index, p.id),
+  );
+  let source = -1;
+  if (!pick) {
+    // If the pool is exhausted, reclaim a Pokemon from a wrong, editable cell.
+    source = state.entries.findIndex(
+      (id, i) =>
+        i !== index &&
+        !puzzle.givens[i] &&
+        pairKey(byId.get(id)?.types || []) === key &&
+        pairKey(puzzle.solution[i]) !== key,
+    );
+    if (source < 0) return null;
+  }
+  const id = pick?.id ?? state.entries[source];
+  remember(state);
+  if (source >= 0) writeEntry(puzzle, state, byId, source, null);
+  writeEntry(puzzle, state, byId, index, id);
+  state.hints++;
+  return { id, source };
 }
 
 export function setNotes(puzzle, state, index, types) {
@@ -280,12 +355,15 @@ export function isComplete(puzzle, state, byId) {
 }
 
 export function wrongCells(puzzle, state, byId) {
-  return state.entries.flatMap((id, i) =>
-    id !== null &&
-    pairKey(byId.get(id)?.types || []) !== pairKey(puzzle.solution[i])
-      ? [i]
-      : [],
-  );
+  const wrong = duplicatePokemonCells(state.entries);
+  state.entries.forEach((id, i) => {
+    if (
+      id !== null &&
+      pairKey(byId.get(id)?.types || []) !== pairKey(puzzle.solution[i])
+    )
+      wrong.add(i);
+  });
+  return [...wrong].sort((a, b) => a - b);
 }
 
 export function restoreState(raw, puzzle, byId) {
@@ -311,6 +389,7 @@ export function restoreState(raw, puzzle, byId) {
               byId.get(id).types.every((t) => puzzle.types.includes(t)))) &&
           (!puzzle.givens[i] || id === puzzle.representatives[i]),
       ) &&
+      duplicatePokemonCells(s.entries).size === 0 &&
       s.notes.every(
         (note, i) =>
           Array.isArray(note) &&

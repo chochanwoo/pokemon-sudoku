@@ -1,5 +1,88 @@
 import { test, expect } from "@playwright/test";
 
+test("every page shares the same home brand and game logos return to the library", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  let reference;
+  for (const [name, path, title] of [
+    ["home", "./", "포켓몬 퀴즈"],
+    [
+      "sudoku",
+      "./sudoku.html?size=4&level=easy&seed=free:brand",
+      "타입도쿠 | 포켓몬 퀴즈",
+    ],
+    [
+      "pokemantle",
+      "./pokemantle.html?date=2026-09-10",
+      "포케맨틀 | 포켓몬 퀴즈",
+    ],
+  ]) {
+    await page.goto(path);
+    const brand = page.getByRole("link", {
+      name: "포켓몬 퀴즈 메인으로",
+      exact: true,
+    });
+    await expect(brand).toBeVisible();
+    await expect(page).toHaveTitle(title);
+    await expect(brand).toHaveAttribute("href", "./");
+    await expect(brand.locator("svg.lucide-gamepad-2")).toHaveCount(1);
+    await expect(brand.locator(".brand-caption")).toHaveText("POKÉMON QUIZ");
+    reference ??= await brand.innerHTML();
+    expect(await brand.innerHTML()).toBe(reference);
+    if (name !== "home") {
+      await expect(page.locator(".header-actions > a")).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "내 기록", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "게임 규칙", exact: true }),
+      ).toBeVisible();
+    }
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const layout = await brand.evaluate((el) => {
+        const box = el.getBoundingClientRect(),
+          header = el.parentElement.getBoundingClientRect(),
+          next = el.nextElementSibling.getBoundingClientRect();
+        return {
+          fits:
+            box.left >= header.left &&
+            box.right <= (next.width ? next.left : header.right) &&
+            box.top >= header.top &&
+            box.bottom <= header.bottom &&
+            el.scrollWidth <= el.clientWidth,
+          color: getComputedStyle(el.querySelector(".brand-mark"))
+            .backgroundColor,
+          icon: el.querySelector("svg").getBoundingClientRect().width,
+          overflow: document.documentElement.scrollWidth > innerWidth,
+        };
+      });
+      expect(layout.fits).toBe(true);
+      expect(layout.color).toBe("rgb(223, 71, 72)");
+      expect(layout.icon).toBeGreaterThan(20);
+      expect(layout.overflow).toBe(false);
+      if (width !== 320)
+        await page
+          .locator(".site-header")
+          .screenshot({ path: `.preview/brand-${name}-${width}.png` });
+    }
+    if (name === "sudoku") {
+      await brand.focus();
+      await brand.press("Enter");
+    } else {
+      await page.setViewportSize({ width: 390, height: 900 });
+      await brand.locator(".brand-mark").click();
+    }
+    await expect(page).toHaveURL("http://127.0.0.1:4173/pokemon/");
+    await expect(
+      page.getByRole("heading", { name: "전체 게임" }),
+    ).toBeVisible();
+  }
+  expect(errors).toEqual([]);
+});
+
 test("game library is responsive, uses a real local preview and does not start Sudoku", async ({
   page,
 }) => {
@@ -8,7 +91,7 @@ test("game library is responsive, uses a real local preview and does not start S
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (request) => requests.push(request.url()));
   await page.goto("./");
-  await expect(page).toHaveTitle("포켓몬 게임");
+  await expect(page).toHaveTitle("포켓몬 퀴즈");
   await expect(page.getByRole("heading", { name: "전체 게임" })).toBeVisible();
   const game = page.getByRole("link", { name: "타입도쿠 플레이", exact: true });
   await expect(game).toHaveAttribute("href", "./sudoku.html");
@@ -88,7 +171,7 @@ test("home, game, browser history and direct refresh preserve saved moves and no
     .first()
     .getAttribute("data-note");
   await page.locator(`[data-note="${type}"]`).check();
-  await page.getByRole("link", { name: "게임 목록으로" }).click();
+  await page.getByRole("link", { name: "포켓몬 퀴즈 메인으로" }).click();
   await expect(page).toHaveURL(/\/pokemon\/$/);
   await expect(page.locator("#board")).toHaveCount(0);
   await page.reload();
@@ -103,7 +186,7 @@ test("home, game, browser history and direct refresh preserve saved moves and no
   const savedPokemon = await page
     .locator(`[data-cell="${index}"]`)
     .getAttribute("aria-label");
-  await page.getByRole("link", { name: "게임 목록으로" }).click();
+  await page.getByRole("link", { name: "포켓몬 퀴즈 메인으로" }).click();
   await page.goBack();
   await expect(page.locator(`[data-cell="${index}"]`)).toHaveAttribute(
     "aria-label",
@@ -160,7 +243,7 @@ test("legacy shared links open Sudoku and new links never point to the library",
   expect(url.pathname).toBe("/pokemon/sudoku.html");
   expect(url.searchParams.get("seed")).toBe("free:oldlink");
   await page.getByRole("button", { name: "닫기", exact: true }).click();
-  await page.getByRole("link", { name: "게임 목록으로" }).click();
+  await page.getByRole("link", { name: "포켓몬 퀴즈 메인으로" }).click();
   await expect(page.getByRole("heading", { name: "전체 게임" })).toBeVisible();
   await page
     .getByRole("link", { name: "타입도쿠 플레이", exact: true })

@@ -44,8 +44,10 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (request) => requests.push(request.url()));
   await page.goto(path);
-  await expect(page).toHaveTitle("포케맨틀 | 포켓몬 게임");
-  await expect(page.locator(".site-header .brand")).toContainText("포케맨틀");
+  await expect(page).toHaveTitle("포케맨틀 | 포켓몬 퀴즈");
+  await expect(page.locator(".site-header .brand")).toContainText(
+    "포켓몬 퀴즈",
+  );
   await expect(page.locator(".pm-footer")).toContainText("포케맨틀");
   const input = page.getByRole("combobox", {
     name: "포켓몬 이름 또는 도감 번호",
@@ -97,7 +99,7 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   await page.getByRole("button", { name: "내 기록" }).click();
   await expect(page.locator("#pm-dialog-body")).toContainText("2회 정답");
   await page.getByRole("button", { name: "닫기", exact: true }).click();
-  await page.getByRole("link", { name: "게임 목록으로" }).click();
+  await page.getByRole("link", { name: "포켓몬 퀴즈 메인으로" }).click();
   await page
     .getByRole("link", { name: "포케맨틀 플레이", exact: true })
     .click();

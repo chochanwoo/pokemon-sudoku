@@ -1,5 +1,6 @@
 import { createIcons, Gamepad2, ArrowRight } from "lucide";
 import { games } from "./games.js";
+import { siteBrand } from "./site-brand.js";
 import "./style.css";
 import "./home.css";
 
@@ -9,7 +10,7 @@ if (new URLSearchParams(location.search).has("seed")) {
 } else {
   document.querySelector("#app").innerHTML = `
     <header class="site-header"><div class="header-inner">
-      <a class="brand" href="./" aria-label="포켓몬 게임 메인"><span class="brand-mark"><i data-lucide="gamepad-2" aria-hidden="true"></i></span><span>포켓몬 게임<span class="brand-caption">POKÉMON GAMES</span></span></a>
+      ${siteBrand}
       <span class="hub-header-label">비공식 팬 게임</span>
     </div></header>
     <main class="main hub-main">
@@ -30,7 +31,7 @@ if (new URLSearchParams(location.search).has("seed")) {
           )
           .join("")}</div>
       </section>
-      <footer class="footer hub-footer"><span>포켓몬 게임 <span class="footer-dot">·</span> 비공식 팬 게임</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">데이터 · PokéAPI <i data-lucide="arrow-right" aria-hidden="true"></i></a></footer>
+      <footer class="footer hub-footer"><span>포켓몬 퀴즈 <span class="footer-dot">·</span> 비공식 팬 게임</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">데이터 · PokéAPI <i data-lucide="arrow-right" aria-hidden="true"></i></a></footer>
     </main>`;
   createIcons({
     icons: { Gamepad2, ArrowRight },

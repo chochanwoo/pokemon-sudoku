@@ -1,0 +1,1 @@
+export const siteBrand = `<a class="brand" href="./" aria-label="포켓몬 퀴즈 메인으로"><span class="brand-mark"><i data-lucide="gamepad-2" aria-hidden="true"></i></span><span>포켓몬 퀴즈<span class="brand-caption">POKÉMON QUIZ</span></span></a>`;

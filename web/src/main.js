@@ -23,7 +23,8 @@ import {
   CalendarDays,
   ChevronDown,
   ListChecks,
-  House,
+  Gamepad2,
+  Eye,
 } from "lucide";
 import {
   makePuzzle,
@@ -31,6 +32,8 @@ import {
   findConflicts,
   canPlace,
   placePokemon,
+  isPokemonUsed,
+  applyHint,
   toggleNote,
   setNotes,
   undo,
@@ -45,6 +48,7 @@ import {
   dayKey,
   pairKey,
 } from "./engine.js";
+import { siteBrand } from "./site-brand.js";
 import "./style.css";
 
 const icons = {
@@ -71,7 +75,8 @@ const icons = {
   CalendarDays,
   ChevronDown,
   ListChecks,
-  House,
+  Gamepad2,
+  Eye,
 };
 const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 const esc = (text) =>
@@ -94,6 +99,7 @@ let selected = -1,
 let query = "",
   filters = [],
   legalOnly = false,
+  showCandidates = false,
   paused = false,
   checked = new Set(),
   highlighted = null;
@@ -142,8 +148,8 @@ const tool = (action, label, glyph, extra = "") =>
 function mount() {
   app.innerHTML = `
     <header class="site-header"><div class="header-inner">
-      <a class="brand" href="./sudoku.html"><span class="brand-mark">${icon("grid-2-x2")}</span><span>타입도쿠<span class="brand-caption">POKÉMON SUDOKU</span></span></a>
-      <nav class="header-actions" aria-label="게임 메뉴"><a class="icon-button" href="./" aria-label="게임 목록으로" data-tooltip="게임 목록으로">${icon("house")}</a>${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
+      ${siteBrand}
+      <nav class="header-actions" aria-label="게임 메뉴">${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
     </div></header>
     <main class="main">
       <section class="game-heading">
@@ -180,12 +186,18 @@ function mount() {
             <div class="section-line"><h3>후보 타입 메모 <span id="note-count"></span></h3><div class="note-actions">${tool("auto-notes", "충돌 없는 후보 메모", "list-checks")}${tool("clear-notes", "후보 메모 지우기", "eraser")}</div></div>
             <div class="note-types" id="note-types"></div>
           </section>
-          <div id="pokemon-picker"><label class="search-box">${icon("search")}<input id="search" type="search" placeholder="이름 또는 도감 번호" autocomplete="off" aria-label="포켓몬 검색" /> </label>
-            <div class="picker-filter-heading"><span>타입 필터</span><button id="clear-filter" class="link-button" data-action="clear-filter" hidden>초기화</button></div>
-            <div class="type-filters" id="type-filters"></div>
-            <label class="legal-toggle"><input id="legal-only" type="checkbox" /><span>충돌 없는 후보만</span></label>
-            <div class="results-heading"><span id="result-count"></span><span class="small-muted">기본 폼</span></div>
-            <div id="pokemon-results" class="pokemon-results"></div>
+          <div id="pokemon-picker">
+            <div class="picker-search-heading"><h3>포켓몬 검색</h3><button class="cheat-toggle" data-action="cheat" role="switch" aria-checked="false" aria-label="치트: 후보 포켓몬 보기" aria-controls="candidate-filters search-results" title="후보 포켓몬 보기">${icon("eye")}<span>치트</span><span class="cheat-switch" aria-hidden="true"></span></button></div>
+            <label class="search-box">${icon("search")}<input id="search" type="search" placeholder="이름 또는 도감 번호" autocomplete="off" aria-label="포켓몬 검색" /> </label>
+            <div id="candidate-filters" hidden>
+              <div class="picker-filter-heading"><span>타입 필터</span><button id="clear-filter" class="link-button" data-action="clear-filter" hidden>초기화</button></div>
+              <div class="type-filters" id="type-filters"></div>
+              <label class="legal-toggle"><input id="legal-only" type="checkbox" /><span>충돌 없는 후보만</span></label>
+            </div>
+            <div id="search-results" hidden>
+              <div class="results-heading"><span id="result-count"></span><span class="small-muted">기본 폼</span></div>
+              <div id="pokemon-results" class="pokemon-results"></div>
+            </div>
           </div>
         </aside>
       </div>
@@ -283,6 +295,8 @@ function start(settings, allowRestore = true) {
   selected = -1;
   query = "";
   filters = [];
+  legalOnly = false;
+  showCandidates = false;
   checked.clear();
   highlighted = null;
   pencil = false;
@@ -486,6 +500,12 @@ function renderPicker() {
     )
     .join("");
   document.querySelector("#search").value = query;
+  document.querySelector("#candidate-filters").hidden = !showCandidates;
+  const cheatToggle = document.querySelector('[data-action="cheat"]');
+  cheatToggle.setAttribute("aria-checked", showCandidates);
+  cheatToggle.title = showCandidates
+    ? "후보 포켓몬 숨기기"
+    : "후보 포켓몬 보기";
   document.querySelector("#legal-only").checked = legalOnly;
   document.querySelector("#clear-filter").hidden = !filters.length;
   renderResults();
@@ -516,12 +536,19 @@ function boardUnitMarkup(unit) {
 }
 
 function renderResults() {
+  const visible = showCandidates || query.trim().length > 0;
+  document.querySelector("#search-results").hidden = !visible;
+  if (!visible) {
+    document.querySelector("#result-count").textContent = "";
+    document.querySelector("#pokemon-results").innerHTML = "";
+    return;
+  }
   let pool = catalog.pokemon.filter(
     (p) =>
       p.types.every((t) => puzzle.types.includes(t)) &&
-      filters.every((t) => p.types.includes(t)),
+      (!showCandidates || filters.every((t) => p.types.includes(t))),
   );
-  if (legalOnly && selected >= 0)
+  if (showCandidates && legalOnly && selected >= 0)
     pool = pool.filter((p) =>
       canPlace(puzzle, state.entries, byId, selected, p.id),
     );
@@ -531,13 +558,12 @@ function renderResults() {
     selected >= 0 && !puzzle.givens[selected] && !complete && !paused;
   document.querySelector("#pokemon-results").innerHTML = matches.length
     ? matches
-        .map(
-          (
-            p,
-          ) => `<button class="pokemon-choice ${state.entries[selected] === p.id ? "chosen" : ""}" data-pokemon="${p.id}" aria-label="${esc(p.name)}, ${p.types.map((t) => types.get(t).name).join(" ")}" ${!editable ? 'aria-disabled="true"' : ""}>
-    ${sprite(p, "", true)}<span class="choice-name">${esc(p.name)}</span><span class="choice-types">${p.types.map(badge).join("")}</span><span class="choice-number">#${String(p.id).padStart(3, "0")}</span>
-  </button>`,
-        )
+        .map((p) => {
+          const used = isPokemonUsed(state.entries, selected, p.id);
+          return `<button class="pokemon-choice ${state.entries[selected] === p.id ? "chosen" : ""} ${used ? "used" : ""}" data-pokemon="${p.id}" aria-label="${esc(p.name)}, ${p.types.map((t) => types.get(t).name).join(" ")}${used ? ", 이미 사용 중" : ""}" ${!editable || used ? 'aria-disabled="true"' : ""}>
+    ${sprite(p, "", true)}<span class="choice-name">${esc(p.name)}</span><span class="choice-types">${p.types.map(badge).join("")}</span><span class="choice-number">#${String(p.id).padStart(3, "0")}</span>${used ? '<span class="choice-used">사용 중</span>' : ""}
+  </button>`;
+        })
         .join("")
     : `<div class="empty-results">${icon("search")}<strong>일치하는 포켓몬이 없어요</strong><button class="text-button" data-action="clear-search">검색 초기화</button></div>`;
   refreshIcons();
@@ -615,6 +641,10 @@ function choosePokemon(id) {
     toast("먼저 빈 칸을 선택해 주세요.");
     return;
   }
+  if (isPokemonUsed(state.entries, selected, id)) {
+    toast("이미 보드에 있는 포켓몬이에요. 다른 포켓몬을 선택해 주세요.");
+    return;
+  }
   if (placePokemon(puzzle, state, byId, selected, id)) {
     closePicker();
     afterMove();
@@ -688,6 +718,14 @@ function handleClick(e) {
   )
     return;
   switch (action) {
+    case "cheat":
+      if (paused) return;
+      showCandidates = !showCandidates;
+      query = "";
+      filters = [];
+      legalOnly = false;
+      renderPicker();
+      break;
     case "auto-notes": {
       const candidates = getCandidateTypes(
         puzzle,
@@ -875,12 +913,14 @@ function giveHint() {
       : (wrong[0] ?? state.entries.findIndex((id) => id === null));
   if (index < 0) return;
   const pair = puzzle.solution[index];
-  state.hints++;
+  const result = applyHint(puzzle, state, byId, index);
+  if (!result) return;
   selected = index;
-  placePokemon(puzzle, state, byId, index, puzzle.representatives[index]);
   afterMove();
   toast(
-    `${Math.floor(index / size) + 1}행 ${(index % size) + 1}열: ${pair.map((t) => types.get(t).name).join(" + ")}`,
+    result.source >= 0
+      ? `${byId.get(result.id).name}을 ${Math.floor(index / size) + 1}행 ${(index % size) + 1}열로 옮겼어요.`
+      : `${Math.floor(index / size) + 1}행 ${(index % size) + 1}열: ${pair.map((t) => types.get(t).name).join(" + ")}`,
   );
 }
 
@@ -931,7 +971,7 @@ function showHelp() {
   showDialog(
     "타입도쿠 규칙",
     `<div class="rule-example">${sprite(byId.get(1))}<div><strong>이상해씨</strong><div>${[12, 4].map(badge).join("")}</div></div></div>
-    <ol class="rules"><li>빈 칸마다 <strong>두 타입을 가진 포켓몬</strong>을 놓습니다.</li><li>같은 가로줄, 세로줄, 굵은 선으로 나눈 구역 안에서는 <strong>어떤 타입도 두 번 나올 수 없습니다.</strong></li><li>각 줄과 구역에 이번 퍼즐의 ${puzzle.types.length}개 타입이 한 번씩 들어가면 완성입니다.</li><li>주어진 포켓몬은 바꿀 수 없습니다. 같은 타입 조합의 포켓몬은 모두 정답으로 인정합니다.</li></ol>
+    <ol class="rules"><li>빈 칸마다 <strong>두 타입을 가진 포켓몬</strong>을 놓습니다.</li><li>같은 가로줄, 세로줄, 굵은 선으로 나눈 구역 안에서는 <strong>어떤 타입도 두 번 나올 수 없습니다.</strong></li><li><strong>같은 포켓몬은 보드 전체에서 한 번만</strong> 사용할 수 있습니다. 주어진 포켓몬도 포함합니다.</li><li>각 줄과 구역에 이번 퍼즐의 ${puzzle.types.length}개 타입이 한 번씩 들어가면 완성입니다.</li><li>주어진 포켓몬은 바꿀 수 없습니다. 같은 타입 조합이라도 서로 다른 포켓몬이면 사용할 수 있습니다.</li></ol>
     <p class="dialog-copy">오늘의 퍼즐은 한국 시간 자정에 바뀝니다. 크기와 난이도가 같으면 모두 같은 문제를 받습니다.</p>
     <p class="dialog-copy">포켓몬 기본 폼 526종을 사용합니다. 지역 폼과 메가진화는 포함하지 않습니다.</p>`,
   );
@@ -1006,7 +1046,7 @@ async function boot() {
   try {
     [catalog, pack] = await Promise.all(
       ["catalog.json", "puzzles.json"].map(async (path) => {
-        const response = await fetch(asset(path));
+        const response = await fetch(asset(path), { cache: "no-cache" });
         if (!response.ok) throw new Error(`Data: ${response.status}`);
         return response.json();
       }),

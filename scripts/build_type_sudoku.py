@@ -1,6 +1,7 @@
 """Export a small, self-contained static game dataset from the master database."""
 
 import argparse
+from collections import Counter
 import concurrent.futures
 import io
 import json
@@ -40,12 +41,26 @@ def units(n, bh, bw):
     return result
 
 
-def model_for(n, bh, bw, type_ids, pairs, clues=None, excluded=None):
+def model_for(n, bh, bw, type_ids, pairs, clues=None, excluded=None, capacities=None):
     model = cp_model.CpModel()
     cells = [(model.new_int_var_from_domain(cp_model.Domain.from_values(type_ids), f"a{i}"),
               model.new_int_var_from_domain(cp_model.Domain.from_values(type_ids), f"b{i}")) for i in range(n*n)]
-    for a, b in cells:
-        model.add_allowed_assignments([a, b], pairs)
+    pair_ids = []
+    for i, (a, b) in enumerate(cells):
+        pair_id = model.new_int_var(0, len(pairs)-1, f"pair{i}")
+        pair_ids.append(pair_id)
+        model.add_allowed_assignments([a, b, pair_id], [[*pair, j] for j, pair in enumerate(pairs)])
+    # Each species belongs to one pair; limiting pair counts permits unique Pokemon.
+    for j, pair in enumerate(pairs):
+        capacity = capacities.get(tuple(pair), 0) if capacities is not None else n
+        if capacity >= n:
+            continue
+        matches = []
+        for i, pair_id in enumerate(pair_ids):
+            matches.append(model.new_bool_var(f"pair{j}_at{i}"))
+            model.add(pair_id == j).only_enforce_if(matches[-1])
+            model.add(pair_id != j).only_enforce_if(matches[-1].Not())
+        model.add(sum(matches) <= capacity)
     for unit in units(n, bh, bw):
         model.add_all_different([v for i in unit for v in cells[i]])
     for i, pair in (clues or {}).items():
@@ -69,7 +84,7 @@ def solve(model, cells, seed, seconds, workers=1):
     return result, None
 
 
-def make_puzzle(n, bh, bw, pairs, seed):
+def make_puzzle(n, bh, bw, pairs, capacities, seed):
     rng = random.Random(seed)
     for attempt in range(40):
         selected = sorted(rng.sample(range(1, 19), n * 2))
@@ -90,7 +105,7 @@ def make_puzzle(n, bh, bw, pairs, seed):
         first_row = [pair for i, pair in enumerate(allowed) if matching_solver.value(chosen[i])]
         rng.shuffle(first_row)
         fixed = dict(enumerate(first_row))
-        model, cells = model_for(n, bh, bw, selected, allowed, fixed)
+        model, cells = model_for(n, bh, bw, selected, allowed, fixed, capacities=capacities)
         # At least one new pair makes the puzzle more than a renamed number Sudoku.
         model.add_forbidden_assignments(cells[n+1], first_row)
         _, solution = solve(model, cells, seed + attempt, 8, workers=8)
@@ -112,13 +127,13 @@ def make_puzzle(n, bh, bw, pairs, seed):
             if i not in clues or i in rejected:
                 continue
             pair = clues.pop(i)
-            model, cells = model_for(n, bh, bw, selected, allowed, clues, solution)
+            model, cells = model_for(n, bh, bw, selected, allowed, clues, solution, capacities)
             status, _ = solve(model, cells, seed, .65)
             if status != cp_model.INFEASIBLE:
                 clues[i] = pair
                 rejected.add(i)
         masks[difficulty] = sorted(clues)
-    return {"id": f"v1-{n}-{seed}", "size": n, "boxRows": bh, "boxCols": bw,
+    return {"id": f"v2-{n}-{seed}", "uniquePokemon": True, "size": n, "boxRows": bh, "boxCols": bw,
             "types": selected, "solution": solution, "givens": masks}
 
 
@@ -150,23 +165,37 @@ def main():
     args = parser.parse_args()
     PUBLIC.mkdir(parents=True, exist_ok=True)
     (PUBLIC / "sprites").mkdir(exist_ok=True)
-    types, pokemon = export_catalog()
+    if args.puzzles_only or args.verify:
+        catalog = json.loads((PUBLIC / "catalog.json").read_text(encoding="utf-8"))
+        types, pokemon = catalog["types"], catalog["pokemon"]
+    else:
+        types, pokemon = export_catalog()
+    capacities = Counter(tuple(p["types"]) for p in pokemon)
     if args.verify:
         puzzles = json.loads((PUBLIC / "puzzles.json").read_text(encoding="utf-8"))
         pairs = sorted({tuple(p["types"]) for p in pokemon})
         for puzzle in puzzles:
+            if len(puzzle["solution"]) != puzzle["size"] ** 2 or any(
+                sorted(t for i in unit for t in puzzle["solution"][i]) != puzzle["types"]
+                for unit in units(puzzle["size"], puzzle["boxRows"], puzzle["boxCols"])
+            ):
+                raise RuntimeError(f"Invalid stored solution: {puzzle['id']}")
+            counts = Counter(tuple(pair) for pair in puzzle["solution"])
+            if not puzzle.get("uniquePokemon") or any(count > capacities[pair] for pair, count in counts.items()):
+                raise RuntimeError(f"Duplicate-free assignment is impossible: {puzzle['id']}")
             allowed = [p for p in pairs if all(t in puzzle["types"] for t in p)]
             for difficulty, givens in puzzle["givens"].items():
                 model, cells = model_for(puzzle["size"], puzzle["boxRows"], puzzle["boxCols"],
                                          puzzle["types"], allowed,
-                                         {i: puzzle["solution"][i] for i in givens}, puzzle["solution"])
+                                         {i: puzzle["solution"][i] for i in givens}, puzzle["solution"], capacities)
                 status, _ = solve(model, cells, 1, 10, workers=8)
                 if status != cp_model.INFEASIBLE:
                     raise RuntimeError(f"Uniqueness verification failed: {puzzle['id']} {difficulty}")
-        print(f"Verified unique solutions for all {len(puzzles)*3} puzzle/difficulty combinations", flush=True)
+        print(f"Verified duplicate-free unique solutions for all {len(puzzles)*3} puzzle/difficulty combinations", flush=True)
         return
     catalog = {"version": 1, "types": types, "pokemon": [{k:v for k,v in p.items() if k != "url"} for p in pokemon]}
-    (PUBLIC / "catalog.json").write_text(json.dumps(catalog, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    if not args.puzzles_only:
+        (PUBLIC / "catalog.json").write_text(json.dumps(catalog, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     if not args.puzzles_only:
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
             list(executor.map(download_sprite, pokemon))
@@ -177,7 +206,7 @@ def main():
         for n, bh, bw in [(4, 2, 2), (6, 2, 3), (9, 3, 3)]:
             for i in range(args.count):
                 print(f"Generating {n}x{n} puzzle {i+1}/{args.count}", flush=True)
-                puzzle = make_puzzle(n, bh, bw, pairs, 7183 + i*971 + n*313)
+                puzzle = make_puzzle(n, bh, bw, pairs, capacities, 7183 + i*971 + n*313)
                 puzzles.append(puzzle)
                 print(f"{puzzle['id']}: " + str({k:len(v) for k,v in puzzle['givens'].items()}), flush=True)
         (PUBLIC / "puzzles.json").write_text(json.dumps(puzzles, separators=(",", ":")), encoding="utf-8")

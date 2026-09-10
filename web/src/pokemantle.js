@@ -1,7 +1,7 @@
 import {
   createIcons,
   ScanSearch,
-  House,
+  Gamepad2,
   CircleHelp,
   ChartNoAxesColumn,
   Search,
@@ -30,12 +30,13 @@ import {
   MAX_HINTS,
   proximityFor,
 } from "./similarity-engine.js";
+import { siteBrand } from "./site-brand.js";
 import "./style.css";
 import "./pokemantle.css";
 
 const icons = {
   ScanSearch,
-  House,
+  Gamepad2,
   CircleHelp,
   ChartNoAxesColumn,
   Search,
@@ -128,8 +129,8 @@ function toast(text) {
 function mount() {
   app.innerHTML = `
     <header class="site-header"><div class="header-inner">
-      <a class="brand" href="./pokemantle.html"><span class="brand-mark pm-mark">${icon("scan-search")}</span><span>포케맨틀<span class="brand-caption">POKÉMON SIMILARITY</span></span></a>
-      <nav class="header-actions" aria-label="게임 메뉴"><a class="icon-button" href="./" aria-label="게임 목록으로" data-tooltip="게임 목록으로">${icon("house")}</a>${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
+      ${siteBrand}
+      <nav class="header-actions" aria-label="게임 메뉴">${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
     </div></header>
     <main class="main pm-main">
       <div id="new-day" class="pm-day-banner" hidden><span>새로운 오늘의 포켓몬이 도착했어요.</span><button class="text-button" data-action="today">${icon("rotate-cw")}오늘의 문제</button></div>

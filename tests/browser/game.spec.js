@@ -6,6 +6,8 @@ import {
   getUnitTypeStatus,
   getCandidateTypes,
   placePokemon,
+  getPeers,
+  canPlace,
 } from "../../web/src/engine.js";
 
 const catalog = JSON.parse(
@@ -97,6 +99,9 @@ test("direct candidate notes, automatic notes and all unit trackers survive move
       })),
     );
   await page
+    .getByRole("searchbox", { name: "포켓몬 검색" })
+    .fill(byId.get(puzzle.representatives[index]).name);
+  await page
     .locator(`[data-pokemon="${puzzle.representatives[index]}"]`)
     .click();
   placePokemon(puzzle, state, byId, index, puzzle.representatives[index]);
@@ -124,9 +129,20 @@ test("direct candidate notes, automatic notes and all unit trackers survive move
       unit.cells.includes(index) && unit.cells.some((i) => puzzle.givens[i]),
   );
   const duplicateCell = duplicateUnit.cells.find((i) => puzzle.givens[i]);
+  const duplicateTypePokemon = catalog.pokemon.find(
+    (p) =>
+      !puzzle.givens.some(
+        (given, i) => given && puzzle.representatives[i] === p.id,
+      ) &&
+      p.types.every((t) => puzzle.types.includes(t)) &&
+      p.types.some((t) =>
+        byId.get(puzzle.representatives[duplicateCell]).types.includes(t),
+      ),
+  );
   await page
-    .locator(`[data-pokemon="${puzzle.representatives[duplicateCell]}"]`)
-    .click();
+    .getByRole("searchbox", { name: "포켓몬 검색" })
+    .fill(duplicateTypePokemon.name);
+  await page.locator(`[data-pokemon="${duplicateTypePokemon.id}"]`).click();
   const warningHeader = page.locator(
     `[data-board-unit="${duplicateUnit.kind}-${duplicateUnit.index}"]`,
   );
@@ -146,6 +162,250 @@ test("direct candidate notes, automatic notes and all unit trackers survive move
     fullPage: true,
   });
 });
+
+for (const width of [390, 1440]) {
+  test(`candidate cheat is opt-in and manual search still works at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const puzzle = makePuzzle(pack, catalog, {
+      size: 6,
+      difficulty: "hard",
+      seed: "free:cheat",
+    });
+    const state = newState(puzzle);
+    const index = state.entries.indexOf(null),
+      id = puzzle.representatives[index];
+    await page.goto("./sudoku.html?size=6&level=hard&seed=free:cheat");
+    const cheat = page.getByRole("switch", { name: "치트: 후보 포켓몬 보기" });
+    const search = page.getByRole("searchbox", { name: "포켓몬 검색" });
+    const cell = page.locator(`[data-cell="${index}"]`);
+    await cell.click();
+    await expect(cheat).not.toBeChecked();
+    await expect(page.locator("#candidate-filters")).toBeHidden();
+    await expect(page.locator("#search-results")).toBeHidden();
+    await expect(page.locator(".pokemon-choice")).toHaveCount(0);
+    await page.locator("[data-note]").first().check();
+    const board = await page.locator("#board").innerHTML();
+    await page.screenshot({
+      path: `.preview/cheat-off-${width}.png`,
+      fullPage: true,
+    });
+
+    await search.fill(byId.get(id).name);
+    await expect(page.locator(`[data-pokemon="${id}"]`)).toBeVisible();
+    await expect(cheat).not.toBeChecked();
+    await search.fill("   ");
+    await search.press("Enter");
+    await expect(page.locator(".pokemon-choice")).toHaveCount(0);
+    expect(await page.locator("#board").innerHTML()).toBe(board);
+
+    await cheat.click();
+    await expect(cheat).toBeChecked();
+    await expect(page.locator("#candidate-filters")).toBeVisible();
+    await expect(search).toHaveValue("");
+    const pool = catalog.pokemon.filter((p) =>
+      p.types.every((t) => puzzle.types.includes(t)),
+    );
+    await expect(page.locator(".pokemon-choice")).toHaveCount(pool.length);
+    await page.locator("#legal-only").check();
+    const type = puzzle.solution[index][0];
+    await page.locator(`[data-filter="${type}"]`).click();
+    const expected = pool
+      .filter(
+        (p) =>
+          p.types.includes(type) &&
+          canPlace(puzzle, state.entries, byId, index, p.id),
+      )
+      .map((p) => p.id);
+    expect(
+      await page
+        .locator(".pokemon-choice")
+        .evaluateAll((els) => els.map((el) => Number(el.dataset.pokemon))),
+    ).toEqual(expected);
+    await page.screenshot({
+      path: `.preview/cheat-on-${width}.png`,
+      fullPage: true,
+    });
+    const fits = await cheat.evaluate((el) => {
+      const box = el.getBoundingClientRect(),
+        heading = el.parentElement.getBoundingClientRect(),
+        label = el.previousElementSibling.getBoundingClientRect();
+      return (
+        box.left >= label.right &&
+        box.right <= heading.right &&
+        el.scrollWidth <= el.clientWidth
+      );
+    });
+    expect(fits).toBe(true);
+
+    await cheat.press("Space");
+    await expect(cheat).not.toBeChecked();
+    await expect(cheat).toBeFocused();
+    await expect(page.locator("#candidate-filters")).toBeHidden();
+    await expect(page.locator("#search-results")).toBeHidden();
+    await expect(page.locator(".pokemon-choice")).toHaveCount(0);
+    await expect(page.locator("#legal-only")).not.toBeChecked();
+    expect(await page.locator("#board").innerHTML()).toBe(board);
+    await search.fill(byId.get(id).name);
+    await page.locator(`[data-pokemon="${id}"]`).click();
+    await expect(cell.locator(".sprite")).toHaveCount(1);
+    await cell.click();
+    await cheat.click();
+    await page.reload();
+    await cell.click();
+    await expect(cheat).not.toBeChecked();
+    await expect(page.locator(".pokemon-choice")).toHaveCount(0);
+    await expect(cell.locator(".sprite")).toHaveCount(1);
+    if (width < 800)
+      await page
+        .getByRole("button", { name: "선택창 닫기", exact: true })
+        .click();
+    await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+    await expect(cell.locator(".note-dot")).toHaveCount(1);
+    await cell.click();
+    await cheat.click();
+    if (width < 800)
+      await page
+        .getByRole("button", { name: "선택창 닫기", exact: true })
+        .click();
+    await page.getByRole("button", { name: "4 곱하기 4" }).click();
+    await page.locator(".cell:not(.given)").first().click();
+    await expect(cheat).not.toBeChecked();
+    await expect(page.locator(".pokemon-choice")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+
+  test(`board-wide Pokemon uniqueness, used choices and history at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    const puzzle = makePuzzle(pack, catalog, {
+      size: 6,
+      difficulty: "hard",
+      seed: "free:unique",
+    });
+    const state = newState(puzzle);
+    const index = state.entries.findIndex(
+      (id, i) =>
+        id === null &&
+        state.entries.some(
+          (other, j) => other !== null && !getPeers(puzzle, i).has(j),
+        ) &&
+        state.entries.some(
+          (other, j) =>
+            other === null && j !== i && !getPeers(puzzle, i).has(j),
+        ),
+    );
+    expect(index).toBeGreaterThanOrEqual(0);
+    const fixed = state.entries.findIndex(
+      (id, i) => id !== null && !getPeers(puzzle, index).has(i),
+    );
+    const other = state.entries.findIndex(
+      (id, i) => id === null && i !== index && !getPeers(puzzle, index).has(i),
+    );
+    const oldKey = "typedoku:game:v1-preserved",
+      oldValue = JSON.stringify({ version: 1, entries: [1, 1] });
+    await page.addInitScript(
+      ({ oldKey, oldValue }) => localStorage.setItem(oldKey, oldValue),
+      { oldKey, oldValue },
+    );
+    await page.goto("./sudoku.html?size=6&level=hard&seed=free:unique");
+    const cell = page.locator(`[data-cell="${index}"]`);
+    await cell.click();
+    await page.locator("[data-note]").first().check();
+    const search = page.getByRole("searchbox", { name: "포켓몬 검색" });
+    await search.fill(byId.get(state.entries[fixed]).name);
+    const fixedChoice = page.locator(
+      `[data-pokemon="${state.entries[fixed]}"]`,
+    );
+    await expect(fixedChoice).toHaveClass(/used/);
+    await expect(fixedChoice).toHaveAttribute("aria-disabled", "true");
+    await expect(fixedChoice.locator(".choice-used")).toHaveText("사용 중");
+    await fixedChoice.click({ force: true });
+    await expect(page.locator("#toast")).toContainText(
+      "이미 보드에 있는 포켓몬",
+    );
+    await expect(cell.locator(".sprite")).toHaveCount(0);
+    await expect(cell.locator(".note-dot")).toHaveCount(1);
+    await expect(page.locator(".cell .sprite")).toHaveCount(
+      puzzle.givens.filter(Boolean).length,
+    );
+    const clipped = await fixedChoice.evaluate((el) => {
+      const box = el.getBoundingClientRect(),
+        label = el.querySelector(".choice-used").getBoundingClientRect(),
+        number = el.querySelector(".choice-number").getBoundingClientRect();
+      return (
+        label.right > box.right ||
+        label.left < number.right ||
+        label.top < box.top
+      );
+    });
+    expect(clipped).toBe(false);
+    await page.screenshot({
+      path: `.preview/unique-picker-${width}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("switch", { name: "치트: 후보 포켓몬 보기" }).click();
+    await search.fill(byId.get(state.entries[fixed]).name);
+    await page.locator("#legal-only").check();
+    await expect(fixedChoice).toHaveCount(0);
+    await page.locator("#legal-only").uncheck();
+    const id = puzzle.representatives[index];
+    await search.fill(byId.get(id).name);
+    await page.locator(`[data-pokemon="${id}"]`).click();
+    await page.locator(`[data-cell="${other}"]`).click();
+    const used = page.locator(`[data-pokemon="${id}"]`);
+    await expect(used).toHaveAttribute("aria-disabled", "true");
+    await used.click({ force: true });
+    await expect(page.locator(`[data-cell="${other}"] .sprite`)).toHaveCount(0);
+    await page.reload();
+    await page.locator(`[data-cell="${other}"]`).click();
+    await search.fill(byId.get(id).name);
+    await expect(used).toHaveAttribute("aria-disabled", "true");
+    if (width < 800)
+      await page
+        .getByRole("button", { name: "선택창 닫기", exact: true })
+        .click();
+    await cell.click();
+    if (width < 800)
+      await page
+        .getByRole("button", { name: "선택창 닫기", exact: true })
+        .click();
+    await page
+      .getByRole("button", { name: "선택한 칸 지우기", exact: true })
+      .click();
+    await expect(cell.locator(".sprite")).toHaveCount(0);
+    await page.locator(`[data-cell="${other}"]`).click();
+    await expect(used).not.toHaveAttribute("aria-disabled", "true");
+    if (width < 800)
+      await page
+        .getByRole("button", { name: "선택창 닫기", exact: true })
+        .click();
+    await page.getByRole("button", { name: "되돌리기", exact: true }).click();
+    await page.locator(`[data-cell="${other}"]`).click();
+    await expect(used).toHaveAttribute("aria-disabled", "true");
+    const saved = await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)),
+      `typedoku:game:${puzzle.id}`,
+    );
+    expect(saved.version).toBe(2);
+    const ids = saved.entries.filter((id) => id !== null);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(
+      await page.evaluate((key) => localStorage.getItem(key), oldKey),
+    ).toBe(oldValue);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
 
 test("mobile notes are immediately editable and all 18 fit without resizing the board", async ({
   page,
@@ -408,6 +668,7 @@ test("all 18 local type icons render distinct artwork and expose names on hover,
       external.push(request.url());
   });
   await page.goto("./?size=9&level=hard&seed=free:iconcheck");
+  await page.getByRole("switch", { name: "치트: 후보 포켓몬 보기" }).click();
   await expect(page.locator("#type-filters .type-icon")).toHaveCount(18);
   const samples = await page
     .locator("#type-filters .type-icon")
@@ -541,6 +802,8 @@ test("mobile: size changes, search sheet, selection and completion", async ({
   await page.getByRole("searchbox", { name: "포켓몬 검색" }).fill("없는포켓몬");
   await expect(page.locator(".empty-results")).toBeVisible();
   await page.getByRole("button", { name: "검색 초기화", exact: true }).click();
+  await expect(page.locator(".pokemon-choice")).toHaveCount(0);
+  await page.getByRole("switch", { name: "치트: 후보 포켓몬 보기" }).click();
   await page.locator("#legal-only").check();
   await page.screenshot({ path: ".preview/mobile-picker.png", fullPage: true });
   await page.locator(".pokemon-choice").first().click();
@@ -554,6 +817,20 @@ test("mobile: size changes, search sheet, selection and completion", async ({
   await expect(page.locator("#completion-banner")).toBeVisible();
   await page.reload();
   await expect(page.locator("#completion-banner")).toBeVisible();
+  const savedBoards = await page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("typedoku:game:"))
+      .map((key) =>
+        JSON.parse(localStorage.getItem(key)).entries.filter(
+          (id) => id !== null,
+        ),
+      ),
+  );
+  for (const ids of savedBoards) expect(new Set(ids).size).toBe(ids.length);
+  await page.screenshot({
+    path: ".preview/unique-mobile-complete.png",
+    fullPage: true,
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

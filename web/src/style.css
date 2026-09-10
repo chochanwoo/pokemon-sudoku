@@ -882,6 +882,55 @@ h1 {
   width: 11px;
   height: 11px;
 }
+.picker-search-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.picker-search-heading h3 {
+  font-size: 13px;
+  font-weight: 650;
+}
+.cheat-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 4px 0 4px 8px;
+  color: #747d8b;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.cheat-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+.cheat-switch {
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: #bec5cf;
+  padding: 3px;
+}
+.cheat-switch::after {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+}
+.cheat-toggle[aria-checked="true"] {
+  color: #a46f13;
+}
+.cheat-toggle[aria-checked="true"] .cheat-switch {
+  background: #a46f13;
+}
+.cheat-toggle[aria-checked="true"] .cheat-switch::after {
+  transform: translateX(12px);
+}
 .search-box {
   display: flex;
   align-items: center;
@@ -962,7 +1011,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin: 12px 0 10px;
   color: #747d8b;
   font-size: 12px;
 }
@@ -999,6 +1048,21 @@ h1 {
 .pokemon-choice.chosen {
   border-color: #7499ce;
   background: #edf4ff;
+}
+.pokemon-choice.used {
+  background: #f0f2f5;
+  border-color: #e3e7ed;
+  cursor: not-allowed;
+}
+.pokemon-choice.used .sprite {
+  opacity: 0.5;
+}
+.choice-used {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  color: #717c8c;
+  font-size: 10px;
 }
 .pokemon-choice .sprite {
   width: 64px;
