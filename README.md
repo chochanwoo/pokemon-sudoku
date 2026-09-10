@@ -1,6 +1,6 @@
 # 포켓몬 게임
 
-메인 화면에서 게임을 선택하는 포켓몬 팬 게임 모음입니다. 타입 스도쿠인 **타입도쿠**와 유사도로 오늘의 포켓몬을 맞히는 **포켓몬틀**을 제공합니다. GitHub Pages에서 실행되는 정적 웹사이트이며, 서버나 API 키가 필요하지 않습니다.
+메인 화면에서 게임을 선택하는 포켓몬 팬 게임 모음입니다. 타입 스도쿠인 **타입도쿠**와 유사도로 오늘의 포켓몬을 맞히는 **포케맨틀**을 제공합니다. GitHub Pages에서 실행되는 정적 웹사이트이며, 서버나 API 키가 필요하지 않습니다.
 
 ## 실행
 
@@ -15,12 +15,12 @@ npm run dev
 
 - `web/index.html`과 `web/src/home.js`: 메인 게임 목록입니다.
 - `web/sudoku.html`과 `web/src/main.js`: 타입도쿠입니다. 상단 집 아이콘으로 메인으로 돌아갑니다.
-- `web/pokemantle.html`과 `web/src/pokemantle.js`: 포켓몬틀입니다. 점수·날짜·검색·저장 검증은 `web/src/similarity-engine.js`에 있습니다.
+- `web/pokemantle.html`과 `web/src/pokemantle.js`: 포케맨틀입니다. 점수·날짜·검색·저장 검증은 `web/src/similarity-engine.js`에 있습니다.
 - 기존 `?size=...&level=...&seed=...` 공유 링크는 같은 퍼즐의 `sudoku.html` 주소로 이동합니다. 진행 상황과 기록의 저장 키는 변경하지 않았습니다.
 - 새 게임의 HTML과 스크립트를 만든 후 `web/src/games.js`에 제목, 분류, 미리보기 이미지, 링크를 등록하고 `vite.config.js`의 `build.rollupOptions.input`에 HTML을 추가합니다.
 - 각 게임은 독립된 페이지로 실행됩니다. 다른 게임의 저장 키는 `typedoku:`와 겹치지 않는 접두사를 사용하세요.
 
-## 포켓몬틀
+## 포케맨틀
 
 - 한국 시간 자정마다 같은 날짜의 참가자 모두에게 같은 정답이 주어집니다. 날짜별 고정 순열로 모든 폼이 한 번씩 출제된 후 순환합니다.
 - DB에 있는 1,579개 폼을 각각 별도 정답으로 사용합니다. 리전 폼, 메가진화, 거다이맥스, 모자·색·성별 등의 폼도 구분합니다. 정답은 `pokemon-form` ID가 정확히 일치해야 합니다.

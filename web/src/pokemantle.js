@@ -128,7 +128,7 @@ function toast(text) {
 function mount() {
   app.innerHTML = `
     <header class="site-header"><div class="header-inner">
-      <a class="brand" href="./pokemantle.html"><span class="brand-mark pm-mark">${icon("scan-search")}</span><span>포켓몬틀<span class="brand-caption">POKÉMON SIMILARITY</span></span></a>
+      <a class="brand" href="./pokemantle.html"><span class="brand-mark pm-mark">${icon("scan-search")}</span><span>포케맨틀<span class="brand-caption">POKÉMON SIMILARITY</span></span></a>
       <nav class="header-actions" aria-label="게임 메뉴"><a class="icon-button" href="./" aria-label="게임 목록으로" data-tooltip="게임 목록으로">${icon("house")}</a>${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
     </div></header>
     <main class="main pm-main">
@@ -157,7 +157,7 @@ function mount() {
         <div class="pm-ranking-footer"><span id="ranking-count" class="pm-ranking-count" role="status"></span><button class="text-button" id="more-ranking" data-action="more-ranking">${icon("chevron-down")}더 보기</button></div>
       </section>
       <div class="pm-game-actions"><div><button class="text-button pm-hint" data-action="hint">${icon("lightbulb")}<span id="hint-label">힌트 0/3</span></button><button class="text-button" data-action="give-up">${icon("flag")}포기</button></div><span id="next-puzzle" class="pm-next"></span></div>
-      <footer class="footer pm-footer"><span>포켓몬틀 <span class="footer-dot">·</span> 비공식 팬 게임</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">데이터 · PokéAPI ${icon("arrow-right")}</a></footer>
+      <footer class="footer pm-footer"><span>포케맨틀 <span class="footer-dot">·</span> 비공식 팬 게임</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">데이터 · PokéAPI ${icon("arrow-right")}</a></footer>
     </main>
     <dialog id="pm-dialog"><div class="dialog-header"><h2 id="pm-dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="pm-dialog-body"></div></dialog>`;
   document.querySelector("#guess-input").addEventListener("input", () => {
@@ -509,10 +509,10 @@ async function share() {
   url.search = "";
   url.hash = "";
   url.searchParams.set("date", round.day);
-  const text = `포켓몬틀 ${round.day}\n${isWon(round, target) ? `${round.guesses.length}번 만에 정답` : "도전 종료"} · 힌트 ${hints()}회\n${url.href}`;
+  const text = `포케맨틀 ${round.day}\n${isWon(round, target) ? `${round.guesses.length}번 만에 정답` : "도전 종료"} · 힌트 ${hints()}회\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
-      await navigator.share({ title: "포켓몬틀", text });
+      await navigator.share({ title: "포케맨틀", text });
     else {
       await navigator.clipboard.writeText(text);
       toast("정답을 제외한 결과를 복사했어요.");
@@ -595,7 +595,7 @@ function onClick(event) {
       break;
     case "help":
       dialog(
-        "포켓몬틀 규칙",
+        "포케맨틀 규칙",
         `<ul class="rules"><li>하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 알로라·가라르·히스이·팔데아, 메가진화와 외형 차이도 각각 별개의 정답입니다.</li><li>유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.</li><li>힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.</li><li>한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.</li></ul>`,
       );
       break;

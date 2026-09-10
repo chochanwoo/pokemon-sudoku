@@ -12,6 +12,13 @@ test("game library is responsive, uses a real local preview and does not start S
   await expect(page.getByRole("heading", { name: "전체 게임" })).toBeVisible();
   const game = page.getByRole("link", { name: "타입도쿠 플레이", exact: true });
   await expect(game).toHaveAttribute("href", "./sudoku.html");
+  const pokemantle = page.getByRole("link", {
+    name: "포케맨틀 플레이",
+    exact: true,
+  });
+  await expect(pokemantle).toHaveAttribute("href", "./pokemantle.html");
+  await expect(pokemantle.locator(".game-formats")).toHaveText("데일리");
+  await expect(page.locator(".game-library")).not.toContainText(/1,?579/);
   await expect(page.locator("#board")).toHaveCount(0);
   expect(requests.some((url) => /catalog\.json|puzzles\.json/.test(url))).toBe(
     false,

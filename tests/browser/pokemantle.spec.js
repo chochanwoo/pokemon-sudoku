@@ -44,6 +44,9 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (request) => requests.push(request.url()));
   await page.goto(path);
+  await expect(page).toHaveTitle("포케맨틀 | 포켓몬 게임");
+  await expect(page.locator(".site-header .brand")).toContainText("포케맨틀");
+  await expect(page.locator(".pm-footer")).toContainText("포케맨틀");
   const input = page.getByRole("combobox", {
     name: "포켓몬 이름 또는 도감 번호",
   });
@@ -86,6 +89,7 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   );
   await page.getByRole("button", { name: "결과 공유" }).click();
   const shared = await page.evaluate(() => window.sharedResult);
+  expect(shared).toContain(`포케맨틀 ${regionalDate}`);
   expect(shared).not.toContain("식스테일");
   expect(shared).toContain(`pokemantle.html?date=${regionalDate}`);
   await page.reload();
@@ -95,7 +99,7 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   await page.getByRole("link", { name: "게임 목록으로" }).click();
   await page
-    .getByRole("link", { name: "포켓몬틀 플레이", exact: true })
+    .getByRole("link", { name: "포케맨틀 플레이", exact: true })
     .click();
   await expect(page).toHaveURL(/\/pokemon\/pokemantle\.html$/);
   await expect(input).toBeVisible();
@@ -487,6 +491,9 @@ test("new weights rescore existing guesses without changing today's answer, and 
   await expect(page.locator("#answer-panel")).toBeHidden();
   await expect(page.locator("#ranking-panel")).toBeHidden();
   await page.getByRole("button", { name: "게임 규칙" }).click();
+  await expect(
+    page.getByRole("heading", { name: "포케맨틀 규칙" }),
+  ).toBeVisible();
   const help = page.locator("#pm-dialog-body");
   await expect(help.getByRole("listitem")).toHaveCount(4);
   for (const rule of [
