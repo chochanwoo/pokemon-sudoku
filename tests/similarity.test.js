@@ -15,6 +15,7 @@ import {
   nextHint,
   searchForms,
   MAX_HINTS,
+  proximityFor,
 } from "../web/src/similarity-engine.js";
 
 const data = JSON.parse(
@@ -74,11 +75,95 @@ test("bundled scores are intact, symmetric, bounded, and only exact form IDs sco
     Object.values(data.weights).reduce((a, b) => a + b, 0),
     100,
   );
-  assert.equal(data.weights.abilities, 10);
-  assert.equal(data.weights.moves, 10);
+  assert.deepEqual(data.weights, {
+    types: 25,
+    evolution: 20,
+    classification: 15,
+    motifs: 10,
+    stats: 10,
+    moves: 7,
+    description: 5,
+    abilities: 5,
+    eggGroups: 2,
+    body: 1,
+  });
   assert.ok(game.score(37, 10205) < 100);
   assert.throws(() => createSimilarity(data, new ArrayBuffer(4)));
   assert.throws(() => game.score(-1, 37));
+});
+
+test("score updates preserve the v1 daily schedule and saved form guesses", () => {
+  assert.equal(data.version, "pokemantle-v1");
+  assert.equal(data.similarityVersion, "similarity-v2");
+  assert.equal(dailyTarget(data, "2026-09-10"), 10316);
+  assert.equal(dailyTarget(data, "2026-09-11"), 921);
+  assert.equal(dailyTarget(data, "2024-03-13"), 10205);
+  const legacy = {
+    version: "pokemantle-v1",
+    day: "2026-09-10",
+    guesses: [
+      { id: 381, hint: false },
+      { id: 150, hint: true },
+    ],
+    gaveUp: false,
+  };
+  assert.deepEqual(
+    restoreRound(JSON.stringify(legacy), data, legacy.day),
+    legacy,
+  );
+  assert.deepEqual(
+    restoreRound(JSON.stringify({ ...legacy, gaveUp: true }), data, legacy.day),
+    { ...legacy, gaveUp: true },
+  );
+  const win = {
+    ...legacy,
+    guesses: [...legacy.guesses, { id: 10316, hint: false }],
+  };
+  assert.deepEqual(restoreRound(JSON.stringify(win), data, legacy.day), win);
+});
+
+test("legendary clues lead toward Ultra Necrozma without sacrificing ordinary evolution and regional forms", () => {
+  const byKey = new Map(data.pokemon.map((p) => [p.key, p]));
+  const score = (a, b) => game.score(byKey.get(a).id, byKey.get(b).id);
+  const ultra = "necrozma-ultra";
+  assert.equal(byKey.get(ultra).classification, "major-legendary");
+  assert.equal(byKey.get("latios").classification, "legendary");
+  assert.equal(byKey.get("mew").classification, "mythical");
+  assert.equal(byKey.get("pikachu").classification, "ordinary");
+  assert.ok(byKey.get(ultra).motifs.includes("radiance"));
+  assert.ok(byKey.get("vulpix-alola").motifs.includes("frost"));
+  assert.ok(!byKey.get("vulpix-alola").motifs.includes("flame"));
+  assert.ok(!byKey.get("cosmog").motifs.includes("radiance"));
+  assert.ok(score(ultra, "latios") > 40);
+  assert.ok(score(ultra, "solgaleo") > 40);
+  assert.ok(score(ultra, "mewtwo") > score(ultra, "alakazam"));
+  assert.ok(score(ultra, "alakazam") > score(ultra, "pikachu"));
+  assert.ok(score(ultra, "necrozma") > score(ultra, "latios"));
+  const topForms = game
+    .ranking(byKey.get(ultra).id)
+    .slice(1, 4)
+    .map((r) => game.byId.get(r.id).key);
+  assert.deepEqual(
+    new Set(topForms),
+    new Set(["necrozma", "necrozma-dusk", "necrozma-dawn"]),
+  );
+  assert.ok(score("bulbasaur", "ivysaur") > score("bulbasaur", "oddish"));
+  assert.ok(
+    score("vulpix-alola", "ninetales-alola") > score("vulpix-alola", "cubchoo"),
+  );
+});
+
+test("proximity labels use global competition ranks instead of absolute scores", () => {
+  assert.deepEqual(proximityFor(1, 1579), { tone: "hot", label: "정답" });
+  assert.deepEqual(proximityFor(8, 1579), {
+    tone: "hot",
+    label: "매우 가까움",
+  });
+  assert.equal(proximityFor(15, 1579).tone, "hot");
+  assert.equal(proximityFor(16, 1579).tone, "warm");
+  assert.equal(proximityFor(157, 1579).tone, "warm");
+  assert.equal(proximityFor(158, 1579).tone, "cool");
+  assert.equal(proximityFor(1579, 1579).tone, "cool");
 });
 
 test("daily targets cover every form, remain deterministic and use Korean midnight", () => {

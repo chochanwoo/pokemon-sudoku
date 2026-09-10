@@ -24,8 +24,13 @@ from PIL import Image
 PUBLIC = ROOT / "web" / "public"
 CACHE = ROOT / "data" / "cache" / "pokeapi"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-WEIGHTS = {"description": 30, "types": 20, "evolution": 15, "stats": 10,
-           "abilities": 10, "moves": 10, "eggGroups": 3, "body": 2}
+SIMILARITY_VERSION = "similarity-v2"
+WEIGHTS = {"types": 25, "evolution": 20, "classification": 15, "motifs": 10,
+           "stats": 10, "moves": 7, "description": 5, "abilities": 5,
+           "eggGroups": 2, "body": 1}
+TRAITS = json.loads((Path(__file__).with_name("pokemantle_traits.json")).read_text(encoding="utf-8"))
+MOTIF_PATTERNS = {tag: re.compile(r"\b(?:" + "|".join(re.escape(term) for term in terms) + r")\b", re.I)
+                  for tag, terms in TRAITS["motifs"].items()}
 # Explicit release order: database IDs are not chronological.
 VERSIONS = ["mega-dimension", "legends-za", "scarlet-violet", "legends-arceus",
             "brilliant-diamond-shining-pearl", "sword-shield",
@@ -94,6 +99,44 @@ def jaccard_matrix(sets, rarity=False, reference=None):
     return score, valid[:, None] & valid[None, :]
 
 
+def classification_for(species):
+    if species["is_mythical"]:
+        return "mythical"
+    if species["key"] in TRAITS["majorLegendarySpecies"]:
+        return "major-legendary"
+    return "legendary" if species["is_legendary"] else "ordinary"
+
+
+def motif_tags(text):
+    return {tag for tag, pattern in MOTIF_PATTERNS.items() if pattern.search(text)}
+
+
+def type_matrix(sets):
+    score, valid = jaccard_matrix(sets)
+    return np.where(score == 1, 1, np.where(score > 0, .6, 0)).astype(np.float32), valid
+
+
+def classification_matrix(classes):
+    classes = np.array(classes)
+    special = classes != "ordinary"
+    valid = special[:, None] | special[None, :]
+    score = np.where(classes[:, None] == classes[None, :], 1., 0.)
+    legendary = np.isin(classes, ["legendary", "major-legendary"])
+    score = np.maximum(score, .65 * (legendary[:, None] & legendary[None, :]))
+    score = np.maximum(score, .35 * (special[:, None] & special[None, :]))
+    # Ordinary status alone is not evidence of similarity, nor a missing match.
+    return (score * valid).astype(np.float32), valid
+
+
+def stat_matrix(values):
+    stats = np.array(values, dtype=np.float32)
+    total = stats.sum(axis=1)
+    power = np.exp(-np.abs(np.log(total[:, None] / total[None, :])) / .5)
+    proportions = stats / total[:, None]
+    role = np.exp(-np.mean(np.abs(proportions[:, None] - proportions[None, :]), axis=2) / .08)
+    return (power + role) / 2
+
+
 def load_data():
     with sqlite3.connect(f"file:{(ROOT / 'data/build/pokemon.db').as_posix()}?mode=ro", uri=True) as db:
         db.row_factory = sqlite3.Row
@@ -125,6 +168,9 @@ def load_data():
                 inherited, version, _ = selected_moves[base["id"]]
                 selected_moves[p["id"]] = (inherited, version, "battle-form-base")
     raw_species = {sid: cached("pokemon-species", sid) for sid in species}
+    unknown = set(TRAITS["majorLegendarySpecies"]) - {s["key"] for s in species.values()}
+    if unknown:
+        raise ValueError(f"Unknown classification species: {sorted(unknown)}")
     entries, profiles, features, sources = [], [], [], []
     for form in forms:
         p = pokemon[form["pokemon_id"]]
@@ -145,6 +191,9 @@ def load_data():
         texts = descriptions(raw)
         source = "form" if texts else "species"
         texts = texts or descriptions(raw_species[s["id"]])
+        classification = classification_for(s)
+        # Regional/battle-form text takes precedence over species-wide lore.
+        motifs = motif_tags(" ".join(texts))
         profile = " ".join(texts)
         # Names are search keys, not semantic evidence.
         for name_to_remove in [s["name_en"], s["key"], p["key"]]:
@@ -167,11 +216,13 @@ def load_data():
                         "aliases": list(filter(None, [form["name_ko"], form["name_en"],
                                         form["form_name_ko"], label + s["name_ko"]])),
                         "types": type_ids, "moveVersion": version, "moveSource": move_source,
-                        "descriptionSource": source if texts else "metadata"})
+                        "descriptionSource": source if texts else "metadata",
+                        "classification": classification, "motifs": sorted(motifs)})
         features.append({"types": set(type_ids), "abilities": abilities[p["id"]], "moves": learnt,
                          "eggGroups": set(filter(None, (s["egg_groups"] or "").split("|"))) - {"no-eggs", "ditto"},
                          "stats": [p[k] for k in ["hp", "attack", "defense", "special_attack", "special_defense", "speed"]],
-                         "body": [p["height_dm"], p["weight_hg"]], "species": s["id"]})
+                         "body": [p["height_dm"], p["weight_hg"]], "species": s["id"],
+                         "classification": classification, "motifs": motifs, "hasDescription": bool(texts)})
     counts = Counter(e["name"] for e in entries)
     for entry in entries:
         if counts[entry["name"]] > 1:
@@ -200,14 +251,15 @@ def calculate(features, profiles, species, selected_moves):
     n = len(features)
     components = {"description": semantic_matrix(profiles)}
     masks = {}
-    for key in ["types", "abilities", "moves", "eggGroups"]:
+    components["types"], masks["types"] = type_matrix([f["types"] for f in features])
+    components["classification"], masks["classification"] = classification_matrix([f["classification"] for f in features])
+    for key in ["abilities", "moves", "eggGroups", "motifs"]:
         components[key], masks[key] = jaccard_matrix(
             [f[key] for f in features], rarity=key == "moves",
             reference=[v[0] for v in selected_moves.values()] if key == "moves" else None)
-    stats = np.array([f["stats"] for f in features], dtype=np.float32)
-    spread = np.maximum(np.std(stats, axis=0), 1)
-    distance = np.mean(np.abs((stats[:, None] - stats[None, :]) / spread), axis=2)
-    components["stats"] = np.exp(-distance)
+    has_description = np.array([f["hasDescription"] for f in features])
+    masks["motifs"] = has_description[:, None] & has_description[None, :]
+    components["stats"] = stat_matrix([f["stats"] for f in features])
     body = np.array([f["body"] for f in features], dtype=np.float32)
     valid_body = np.all(body > 0, axis=1)
     logs = np.log(np.maximum(body, 1))
@@ -231,12 +283,16 @@ def calculate(features, profiles, species, selected_moves):
                 distance = min(ap[k] + bp[k] for k in common)
                 evolution[i, j] = evolution[j, i] = .78 ** distance
     components["evolution"] = evolution
+    if set(components) != set(WEIGHTS) or sum(WEIGHTS.values()) != 100:
+        raise ValueError("Every weighted feature must be calculated, with weights totaling 100")
     total, denominator = np.zeros((n, n), dtype=np.float32), np.zeros((n, n), dtype=np.float32)
     for key, weight in WEIGHTS.items():
         mask = masks.get(key, np.ones((n, n), dtype=bool))
         total += weight * components[key] * mask
         denominator += weight * mask
     raw = total / denominator
+    if not np.all(np.isfinite(raw)):
+        raise ValueError("Non-finite similarity score")
     # Matrix multiplication may differ by a final float bit across the diagonal.
     scores = np.minimum(np.rint((raw + raw.T) / 2 * 10000), 9990).astype("<u2")
     np.fill_diagonal(scores, 10000)
@@ -293,13 +349,16 @@ def main():
             entry["image"] = None
             missing.append(entry["key"])
     binary = scores.tobytes()
-    data = {"version": "pokemantle-v1", "model": MODEL, "weights": WEIGHTS,
+    # Answer scheduling and saved guess IDs remain compatible when only scores change.
+    data = {"version": "pokemantle-v1", "similarityVersion": SIMILARITY_VERSION,
+            "traitsVersion": TRAITS["version"], "model": MODEL, "weights": WEIGHTS,
             "matrixSha256": hashlib.sha256(binary).hexdigest(), "types": types,
             "pokemon": entries, "images": images, "missingImages": missing}
     (PUBLIC / "pokemantle.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (PUBLIC / "pokemantle-scores.bin").write_bytes(binary)
     reports = []
-    for key in ["pikachu", "vulpix", "vulpix-alola", "charizard", "charizard-mega-x", "tauros-paldea-aqua-breed"]:
+    for key in ["pikachu", "vulpix", "vulpix-alola", "charizard", "charizard-mega-x",
+                "tauros-paldea-aqua-breed", "necrozma-ultra", "latios", "mewtwo", "bulbasaur", "magikarp", "eevee"]:
         index = next(i for i, p in enumerate(entries) if p["key"] == key)
         closest = np.argsort(-scores[index].astype(int), kind="stable")[1:11]
         reports.append({"pokemon": entries[index]["name"], "neighbors": [{"name": entries[j]["name"], "score": int(scores[index, j]) / 100} for j in closest]})

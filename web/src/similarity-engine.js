@@ -3,6 +3,13 @@ import { dayKey, initials } from "./engine.js";
 export { dayKey };
 export const MAX_HINTS = 3;
 
+export function proximityFor(rank, total) {
+  if (rank === 1) return { tone: "hot", label: "정답" };
+  if (rank / total <= 0.01) return { tone: "hot", label: "매우 가까움" };
+  if (rank / total <= 0.1) return { tone: "warm", label: "가까움" };
+  return { tone: "cool", label: "거리가 있음" };
+}
+
 export function validDay(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
   const time = Date.parse(`${value}T00:00:00Z`);

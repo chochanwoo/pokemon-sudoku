@@ -311,6 +311,13 @@
 .pm-score strong {
   font-size: 17px;
 }
+.pm-proximity {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
 .pm-score-track {
   display: block;
   height: 4px;

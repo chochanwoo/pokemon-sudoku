@@ -453,3 +453,75 @@ test("revealed rankings fit mobile and desktop, render images, and clear for a n
   await expect(page.locator("#history-panel")).toBeVisible();
   await expect(page.locator("#attempts")).toHaveText("0");
 });
+
+test("new weights rescore existing guesses without changing today's answer, and close guesses look close", async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date("2026-09-10T03:00:00Z") });
+  await page.setViewportSize({ width: 320, height: 844 });
+  const legacy = {
+    version: "pokemantle-v1",
+    day: "2026-09-10",
+    guesses: [
+      { id: 381, hint: false },
+      { id: 150, hint: true },
+    ],
+    gaveUp: false,
+  };
+  await page.addInitScript((round) => {
+    if (!localStorage.getItem(`pokemantle:${round.version}:${round.day}`))
+      localStorage.setItem(
+        `pokemantle:${round.version}:${round.day}`,
+        JSON.stringify(round),
+      );
+  }, legacy);
+  await page.goto("./pokemantle.html");
+  await expect(page.locator("#attempts")).toHaveText("2");
+  await expect(page.locator("#hint-label")).toHaveText("힌트 1/3");
+  const latios = page.locator('[data-result="381"]');
+  await expect(latios.locator(".pm-score strong")).toHaveText(
+    game.score(10316, 381).toFixed(2),
+  );
+  await expect(latios.locator(".pm-score")).toHaveClass(/hot/);
+  await expect(latios.locator(".pm-proximity")).toHaveText("매우 가까움");
+  await expect(page.locator("#answer-panel")).toBeHidden();
+  await expect(page.locator("#ranking-panel")).toBeHidden();
+  await page.getByRole("button", { name: "게임 규칙" }).click();
+  for (const weight of [
+    "타입 25%",
+    "진화·폼 관계 20%",
+    "전설·환상 분류 15%",
+    "설정·모티브 10%",
+    "종족값 10%",
+    "도감 설명 5%",
+  ])
+    await expect(page.locator("#pm-dialog-body")).toContainText(weight);
+  await page.getByRole("button", { name: "닫기", exact: true }).click();
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
+    const fits = await page
+      .locator("#guess-history")
+      .evaluate((body) =>
+        [...body.querySelectorAll("td, th")].every(
+          (cell) => cell.scrollWidth <= cell.clientWidth + 1,
+        ),
+      );
+    expect(fits).toBe(true);
+    await page.screenshot({
+      path: `.preview/pokemantle-closeness-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await guess(page, "necrozma-ultra");
+  await expect(page.locator("#answer-title")).toHaveText(
+    "네크로즈마 (울트라네크로즈마)",
+  );
+  await expect(page.locator('[data-ranking="381"] .pm-proximity')).toHaveText(
+    "매우 가까움",
+  );
+  await page.reload();
+  await expect(page.locator("#attempts")).toHaveText("3");
+  await expect(page.locator("#answer-title")).toHaveText(
+    "네크로즈마 (울트라네크로즈마)",
+  );
+});
