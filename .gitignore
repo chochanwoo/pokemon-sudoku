@@ -1,0 +1,9 @@
+node_modules/
+.tools/
+test-results/
+playwright-report/
+.preview/
+__pycache__/
+data/cache/
+data/source/
+data/build/
