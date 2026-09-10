@@ -22,6 +22,8 @@ import {
   Check,
   CalendarDays,
   ChevronDown,
+  ListChecks,
+  House,
 } from "lucide";
 import {
   makePuzzle,
@@ -30,6 +32,7 @@ import {
   canPlace,
   placePokemon,
   toggleNote,
+  setNotes,
   undo,
   redo,
   isComplete,
@@ -37,6 +40,8 @@ import {
   restoreState,
   searchPokemon,
   getPeers,
+  getUnitTypeStatus,
+  getCandidateTypes,
   dayKey,
   pairKey,
 } from "./engine.js";
@@ -65,6 +70,8 @@ const icons = {
   Check,
   CalendarDays,
   ChevronDown,
+  ListChecks,
+  House,
 };
 const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 const esc = (text) =>
@@ -95,6 +102,7 @@ let complete = false,
   storageFailed = false,
   lastTick = performance.now();
 let toastTimeout;
+const unitNames = { row: "행", column: "열", box: "박스" };
 const asset = (path) => `${import.meta.env.BASE_URL}${path}`;
 const storage = {
   get(key) {
@@ -117,16 +125,25 @@ const storage = {
 };
 const sprite = (p, cls = "", lazy = false) =>
   `<img class="sprite ${cls}" src="${p.image || asset(`sprites/${p.id}.png`)}" alt="" width="96" height="96" ${lazy ? 'loading="lazy"' : ""} draggable="false" />`;
+const typeImages = import.meta.glob("./assets/types/*.svg", {
+  query: "?url",
+  import: "default",
+  eager: true,
+});
+const typeIcon = (id) => {
+  const type = types.get(id);
+  return `<img class="type-icon" src="${typeImages[`./assets/types/${type.key}.svg`]}" alt="${esc(type.name)} 타입" data-type-id="${id}" data-type-name="${esc(type.name)}" width="32" height="32" draggable="false" />`;
+};
 const badge = (id) =>
-  `<span class="type-badge type-${id}" title="${esc(types.get(id).name)}">${esc(types.get(id).name)}</span>`;
+  `<span class="type-badge type-${id}">${typeIcon(id)}</span>`;
 const tool = (action, label, glyph, extra = "") =>
   `<button class="icon-button" data-action="${action}" aria-label="${label}" data-tooltip="${label}" ${extra}>${icon(glyph)}</button>`;
 
 function mount() {
   app.innerHTML = `
     <header class="site-header"><div class="header-inner">
-      <a class="brand" href="./"><span class="brand-mark">${icon("grid-2-x2")}</span><span>타입도쿠<span class="brand-caption">POKÉMON SUDOKU</span></span></a>
-      <nav class="header-actions" aria-label="게임 메뉴">${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
+      <a class="brand" href="./sudoku.html"><span class="brand-mark">${icon("grid-2-x2")}</span><span>타입도쿠<span class="brand-caption">POKÉMON SUDOKU</span></span></a>
+      <nav class="header-actions" aria-label="게임 메뉴"><a class="icon-button" href="./" aria-label="게임 목록으로" data-tooltip="게임 목록으로">${icon("house")}</a>${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
     </div></header>
     <main class="main">
       <section class="game-heading">
@@ -140,7 +157,7 @@ function mount() {
         )
           .map(([v, l]) => `<option value="${v}">${l}</option>`)
           .join("")}</select>${icon("chevron-down")}</label></div>
-        <button class="text-button new-button" data-action="new">${icon("shuffle")}<span>새 퍼즐</span></button>
+        <button class="text-button new-button" data-action="new" aria-label="새 퍼즐">${icon("shuffle")}<span>새 퍼즐</span></button>
       </section>
       <div class="game-layout">
         <section class="board-section" aria-label="스도쿠 게임">
@@ -159,6 +176,10 @@ function mount() {
         <aside class="picker" id="picker" aria-label="포켓몬 선택">
           <div class="picker-header"><div><span class="eyebrow" id="cell-label">POKÉDEX</span><h2 id="picker-title">포켓몬 선택</h2></div><button class="icon-button mobile-only" data-action="close-picker" aria-label="선택창 닫기">${icon("x")}</button><span class="picker-count" id="picker-count"></span></div>
           <div id="selected-preview" class="selected-preview"></div>
+          <section id="note-picker" class="note-picker" aria-label="후보 타입 메모" hidden>
+            <div class="section-line"><h3>후보 타입 메모 <span id="note-count"></span></h3><div class="note-actions">${tool("auto-notes", "충돌 없는 후보 메모", "list-checks")}${tool("clear-notes", "후보 메모 지우기", "eraser")}</div></div>
+            <div class="note-types" id="note-types"></div>
+          </section>
           <div id="pokemon-picker"><label class="search-box">${icon("search")}<input id="search" type="search" placeholder="이름 또는 도감 번호" autocomplete="off" aria-label="포켓몬 검색" /> </label>
             <div class="picker-filter-heading"><span>타입 필터</span><button id="clear-filter" class="link-button" data-action="clear-filter" hidden>초기화</button></div>
             <div class="type-filters" id="type-filters"></div>
@@ -166,14 +187,56 @@ function mount() {
             <div class="results-heading"><span id="result-count"></span><span class="small-muted">기본 폼</span></div>
             <div id="pokemon-results" class="pokemon-results"></div>
           </div>
-          <div id="note-picker" hidden><div class="note-types" id="note-types"></div></div>
         </aside>
       </div>
       <footer class="footer"><span>타입도쿠 <span class="footer-dot">·</span> 비공식 팬 게임</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">데이터 · PokéAPI ${icon("arrow-right")}</a></footer>
     </main>
     <div class="picker-backdrop" id="picker-backdrop" hidden></div>
     <dialog id="dialog"><div class="dialog-header"><h2 id="dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="dialog-body"></div></dialog>
-    <div id="toast" role="status" aria-live="polite"></div>`;
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="type-tooltip" role="tooltip" hidden></div>`;
+  let tooltipTimer;
+  const hideTypeTooltip = () => {
+    clearTimeout(tooltipTimer);
+    document.querySelector("#type-tooltip").hidden = true;
+  };
+  const showTypeTooltip = (target, temporary = false) => {
+    hideTypeTooltip();
+    if (!target) return;
+    const tooltip = document.querySelector("#type-tooltip");
+    const dialog = document.querySelector("#dialog");
+    (dialog.open ? dialog : app).append(tooltip);
+    tooltip.textContent = target.dataset.typeName;
+    tooltip.hidden = false;
+    const bounds = target.getBoundingClientRect();
+    tooltip.style.left = `${Math.max(8, Math.min(innerWidth - tooltip.offsetWidth - 8, bounds.left + (bounds.width - tooltip.offsetWidth) / 2))}px`;
+    tooltip.style.top = `${bounds.top >= tooltip.offsetHeight + 12 ? bounds.top - tooltip.offsetHeight - 6 : bounds.bottom + 6}px`;
+    if (temporary) tooltipTimer = setTimeout(hideTypeTooltip, 1800);
+  };
+  app.addEventListener("pointerover", (e) => {
+    if (e.pointerType !== "touch")
+      showTypeTooltip(e.target.closest(".type-icon"));
+  });
+  app.addEventListener("pointerout", (e) => {
+    if (e.pointerType !== "touch") hideTypeTooltip();
+  });
+  app.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch")
+      showTypeTooltip(e.target.closest(".type-icon"), true);
+  });
+  app.addEventListener("focusin", (e) => {
+    showTypeTooltip(
+      e.target
+        .closest(".note-type,.filter-type,.tracker-type")
+        ?.querySelector(".type-icon"),
+    );
+  });
+  app.addEventListener("focusout", hideTypeTooltip);
+  window.addEventListener("scroll", hideTypeTooltip, {
+    capture: true,
+    passive: true,
+  });
+  window.addEventListener("resize", hideTypeTooltip);
   document.querySelector("#search").addEventListener("input", (e) => {
     query = e.target.value;
     renderResults();
@@ -194,8 +257,16 @@ function mount() {
     .querySelector("#picker-backdrop")
     .addEventListener("click", closePicker);
   document.addEventListener("click", handleClick);
+  document.querySelector("#note-types").addEventListener("change", (e) => {
+    if (paused || complete) return;
+    const type = Number(e.target.dataset.note);
+    if (toggleNote(puzzle, state, selected, type)) afterMove();
+  });
   document.addEventListener("keydown", handleKey);
   window.addEventListener("pagehide", save);
+  window.addEventListener("pageshow", () => {
+    lastTick = performance.now();
+  });
   document.addEventListener("visibilitychange", () => {
     save();
     lastTick = performance.now();
@@ -269,7 +340,7 @@ function render() {
       const count = state.entries.filter((id) =>
         byId.get(id)?.types.includes(t),
       ).length;
-      return `<button class="tracker-type ${highlighted === t ? "active" : ""} ${count === size ? "type-done" : ""}" data-highlight="${t}" aria-pressed="${highlighted === t}">${badge(t)}<span>${count}<span>/${size}</span></span>${count === size ? icon("check") : ""}</button>`;
+      return `<button class="tracker-type ${highlighted === t ? "active" : ""} ${count === size ? "type-done" : ""}" data-highlight="${t}" aria-label="${esc(types.get(t).name)} 타입, ${size}개 중 ${count}개" aria-pressed="${highlighted === t}">${badge(t)}<span>${count}<span>/${size}</span></span>${count === size ? icon("check") : ""}</button>`;
     })
     .join("");
   for (const action of ["undo", "redo"])
@@ -306,42 +377,60 @@ function renderBoard() {
   const board = document.querySelector("#board");
   board.className = `board size-${size}`;
   board.style.setProperty("--size", size);
+  // Each box band gets its own header track; all cells retain Sudoku order.
+  board.style.gridTemplateRows = [
+    "var(--column-height)",
+    ...Array.from({ length: size / puzzle.boxRows }, () => [
+      "var(--box-height)",
+      ...Array(puzzle.boxRows).fill("var(--cell-height)"),
+    ]).flat(),
+  ].join(" ");
   board.setAttribute("aria-rowcount", size);
   board.setAttribute("aria-colcount", size);
   const conflicts = findConflicts(puzzle, state.entries, byId);
   const peers = selected >= 0 ? getPeers(puzzle, selected) : new Set();
-  board.innerHTML = state.entries
-    .map((id, i) => {
-      const p = byId.get(id),
-        given = puzzle.givens[i],
-        error = conflicts.has(i) || checked.has(i);
-      const r = Math.floor(i / size),
-        c = i % size;
-      const classes = [
-        "cell",
-        given && "given",
-        selected === i && "selected",
-        peers.has(i) && "peer",
-        error && "conflict",
-        (c + 1) % puzzle.boxCols === 0 && c < size - 1 && "box-right",
-        (r + 1) % puzzle.boxRows === 0 && r < size - 1 && "box-bottom",
-        highlighted && !p?.types.includes(highlighted) && "dimmed",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      const label = `${r + 1}행 ${c + 1}열, ${p ? `${p.name}, ${p.types.map((t) => types.get(t).name).join(" ")}` : "빈 칸"}${given ? ", 고정" : ""}${error ? ", 오류" : ""}`;
-      return `<button class="${classes}" role="gridcell" data-cell="${i}" aria-label="${esc(label)}" aria-selected="${selected === i}" ${given ? 'aria-readonly="true"' : ""} tabindex="${selected === i || (selected < 0 && i === 0) ? 0 : -1}">
+  const units = getUnitTypeStatus(puzzle, state.entries, byId);
+  const headers = units.map(boardUnitMarkup).join("");
+  const spacers = Array.from(
+    { length: size / puzzle.boxRows },
+    (_, band) =>
+      `<span class="board-spacer" aria-hidden="true" style="grid-column:1;grid-row:${2 + band * (puzzle.boxRows + 1)}"></span>`,
+  ).join("");
+  board.innerHTML =
+    `<span class="board-corner" aria-hidden="true">남은<br>타입</span>${headers}${spacers}` +
+    state.entries
+      .map((id, i) => {
+        const p = byId.get(id),
+          given = puzzle.givens[i],
+          error = conflicts.has(i) || checked.has(i);
+        const r = Math.floor(i / size),
+          c = i % size;
+        const classes = [
+          "cell",
+          given && "given",
+          selected === i && "selected",
+          peers.has(i) && "peer",
+          error && "conflict",
+          c === size - 1 && "last-column",
+          (c + 1) % puzzle.boxCols === 0 && c < size - 1 && "box-right",
+          (r + 1) % puzzle.boxRows === 0 && r < size - 1 && "box-bottom",
+          highlighted && !p?.types.includes(highlighted) && "dimmed",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        const label = `${r + 1}행 ${c + 1}열, ${p ? `${p.name}, ${p.types.map((t) => types.get(t).name).join(" ")}` : "빈 칸"}${given ? ", 고정" : ""}${error ? ", 오류" : ""}${!p && state.notes[i].length ? `, 후보 메모: ${state.notes[i].map((t) => types.get(t).name).join(" ")}` : ""}`;
+        return `<button class="${classes}" role="gridcell" data-cell="${i}" style="grid-column:${c + 2};grid-row:${r + 3 + Math.floor(r / puzzle.boxRows)}" aria-label="${esc(label)}" aria-selected="${selected === i}" ${given ? 'aria-readonly="true"' : ""} tabindex="${selected === i || (selected < 0 && i === 0) ? 0 : -1}">
       ${given ? `<span class="cell-lock">${icon("lock-keyhole")}</span>` : ""}
       ${
         p
           ? `${sprite(p)}<span class="cell-name">${esc(p.name)}</span><span class="cell-types">${p.types.map(badge).join("")}</span>`
           : state.notes[i].length
-            ? `<span class="cell-notes">${state.notes[i].map((t) => `<span class="note-dot type-${t}" title="${esc(types.get(t).name)}">${esc(types.get(t).name)}</span>`).join("")}</span>`
+            ? `<span class="cell-notes" style="--note-rows:${Math.ceil(state.notes[i].length / 3)}">${state.notes[i].map((t) => `<span class="note-dot type-${t}">${typeIcon(t)}</span>`).join("")}</span>`
             : '<span class="empty-dot"></span>'
       }
     </button>`;
-    })
-    .join("");
+      })
+      .join("");
 }
 
 function renderStatus() {
@@ -358,7 +447,8 @@ function renderStatus() {
 
 function renderPicker() {
   const p = byId.get(state.entries[selected]);
-  const editable = selected >= 0 && !puzzle.givens[selected] && !complete;
+  const editable =
+    selected >= 0 && !puzzle.givens[selected] && !complete && !paused;
   document.querySelector("#cell-label").textContent =
     selected < 0
       ? "POKÉDEX"
@@ -376,11 +466,17 @@ function renderPicker() {
     ? `${sprite(p)}<div><span class="dex-number">No. ${String(p.id).padStart(4, "0")}</span><strong>${esc(p.name)}</strong><div>${p.types.map(badge).join("")}</div></div>${puzzle.givens[selected] ? `<span class="given-label">${icon("lock-keyhole")}고정</span>` : ""}`
     : `<span class="preview-icon">${icon(pencil ? "pencil" : "grid-2-x2")}</span><div><strong>${selected < 0 ? "아직 선택한 칸이 없어요" : `${Math.floor(selected / size) + 1}행 ${(selected % size) + 1}열`}</strong><span class="small-muted">${selected < 0 ? "빈 칸" : pencil ? "메모 중" : "선택한 빈 칸"}</span></div>`;
   document.querySelector("#pokemon-picker").hidden = pencil;
-  document.querySelector("#note-picker").hidden = !pencil;
+  document.querySelector("#note-picker").hidden = !editable || !!p;
+  document.querySelector("#note-count").textContent =
+    `${state.notes[selected]?.length || 0}`;
+  document.querySelector('[data-action="auto-notes"]').disabled =
+    !editable || !!p;
+  document.querySelector('[data-action="clear-notes"]').disabled =
+    !editable || !state.notes[selected]?.length;
   document.querySelector("#note-types").innerHTML = puzzle.types
     .map(
       (t) =>
-        `<button class="note-type ${state.notes[selected]?.includes(t) ? "active" : ""}" data-note="${t}" aria-pressed="${!!state.notes[selected]?.includes(t)}" ${!editable || p ? "disabled" : ""}>${badge(t)}${state.notes[selected]?.includes(t) ? icon("check") : ""}</button>`,
+        `<label class="note-type ${state.notes[selected]?.includes(t) ? "active" : ""}"><input type="checkbox" data-note="${t}" aria-label="${esc(types.get(t).name)} 후보 메모" ${state.notes[selected]?.includes(t) ? "checked" : ""} ${!editable || p ? "disabled" : ""} />${badge(t)}</label>`,
     )
     .join("");
   document.querySelector("#type-filters").innerHTML = puzzle.types
@@ -393,6 +489,30 @@ function renderPicker() {
   document.querySelector("#legal-only").checked = legalOnly;
   document.querySelector("#clear-filter").hidden = !filters.length;
   renderResults();
+}
+
+function boardUnitMarkup(unit) {
+  const { index, kind, missing, duplicates } = unit;
+  const row =
+    kind === "column"
+      ? 1
+      : kind === "row"
+        ? index + 3 + Math.floor(index / puzzle.boxRows)
+        : 2 +
+          Math.floor(index / (size / puzzle.boxCols)) * (puzzle.boxRows + 1);
+  const column =
+    kind === "row"
+      ? "1"
+      : kind === "column"
+        ? String(index + 2)
+        : `${2 + (index % (size / puzzle.boxCols)) * puzzle.boxCols} / span ${puzzle.boxCols}`;
+  const label = `${index + 1}${unitNames[kind]}`;
+  const description = `${label}, 남은 타입 ${missing.length}개: ${missing.map((t) => types.get(t).name).join(", ") || "완료"}${duplicates.length ? `, 중복: ${duplicates.map((t) => types.get(t).name).join(", ")}` : ""}`;
+  return `<button class="board-unit unit-${kind} ${unit.cells.includes(selected) ? "current-unit" : ""} ${duplicates.length ? "unit-conflict" : ""}" data-unit="${kind}-${index}" data-board-unit="${kind}-${index}" style="grid-row:${row};grid-column:${column}" aria-label="${esc(description)}" aria-haspopup="dialog">
+    <span class="unit-label">${label}${duplicates.length ? '<span class="unit-alert" aria-hidden="true">!</span>' : ""}</span>
+    <span class="compact-types">${missing.map((t) => `<span class="compact-type type-${t}" data-missing-type="${t}">${typeIcon(t)}</span>`).join("") || `<span class="unit-complete">${icon("check")}</span>`}</span>
+    <span class="unit-count sr-only">${missing.length}</span>
+  </button>`;
 }
 
 function renderResults() {
@@ -468,6 +588,7 @@ function closePicker() {
 }
 
 function afterMove() {
+  const focusedNote = document.activeElement?.dataset.note;
   checked.clear();
   const done = isComplete(puzzle, state, byId);
   if (done && !complete) {
@@ -481,6 +602,10 @@ function afterMove() {
   }
   complete = done;
   render();
+  if (focusedNote)
+    document
+      .querySelector(`[data-note="${focusedNote}"]`)
+      ?.focus({ preventScroll: true });
   save();
 }
 
@@ -507,6 +632,17 @@ function handleClick(e) {
     selectCell(Number(el.dataset.cell), true);
     return;
   }
+  if (el.dataset.boardUnit) {
+    if (paused) return;
+    const unit = getUnitTypeStatus(puzzle, state.entries, byId).find(
+      (unit) => `${unit.kind}-${unit.index}` === el.dataset.boardUnit,
+    );
+    showDialog(
+      `${unit.index + 1}${unitNames[unit.kind]} 남은 타입`,
+      `<div class="unit-detail-types">${unit.missing.map(badge).join("") || `<span class="unit-complete">${icon("check")}완료</span>`}</div>${unit.duplicates.length ? `<h3 class="unit-detail-warning">중복 타입</h3><div class="unit-detail-types">${unit.duplicates.map(badge).join("")}</div>` : ""}`,
+    );
+    return;
+  }
   if (el.dataset.pokemon) {
     choosePokemon(Number(el.dataset.pokemon));
     return;
@@ -518,11 +654,6 @@ function handleClick(e) {
       : [...filters.slice(-1), id];
     renderPicker();
     refreshIcons();
-    return;
-  }
-  if (el.dataset.note) {
-    if (toggleNote(puzzle, state, selected, Number(el.dataset.note)))
-      afterMove();
     return;
   }
   if (el.dataset.highlight) {
@@ -543,11 +674,38 @@ function handleClick(e) {
   }
   const action = el.dataset.action;
   if (
-    ["undo", "redo", "erase", "hint", "check", "pencil"].includes(action) &&
+    [
+      "undo",
+      "redo",
+      "erase",
+      "hint",
+      "check",
+      "pencil",
+      "auto-notes",
+      "clear-notes",
+    ].includes(action) &&
     (paused || complete)
   )
     return;
   switch (action) {
+    case "auto-notes": {
+      const candidates = getCandidateTypes(
+        puzzle,
+        state.entries,
+        byId,
+        selected,
+      );
+      if (setNotes(puzzle, state, selected, candidates)) afterMove();
+      toast(
+        candidates.length
+          ? `충돌 없는 후보 ${candidates.length}개를 메모했어요.`
+          : "현재 배치에서 충돌 없는 후보가 없어요.",
+      );
+      break;
+    }
+    case "clear-notes":
+      if (setNotes(puzzle, state, selected, [])) afterMove();
+      break;
     case "undo":
       if (undo(state)) afterMove();
       break;
@@ -646,6 +804,7 @@ function handleKey(e) {
     return;
   }
   if (document.querySelector("#dialog").open || paused) return;
+  if (e.target.closest(".board-unit")) return;
   if (panelOpen && e.key === "Tab") {
     const controls = [
       ...document
@@ -662,7 +821,10 @@ function handleKey(e) {
       first.focus();
     }
   }
-  if (e.target.matches("input,select,textarea")) {
+  if (
+    e.target.matches("input,select,textarea") &&
+    !e.target.matches("[data-note]")
+  ) {
     if (e.target.id === "search" && e.key === "Enter")
       document.querySelector(".pokemon-choice")?.click();
     return;

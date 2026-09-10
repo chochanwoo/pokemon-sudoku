@@ -5,11 +5,15 @@ import {
   makePuzzle,
   newState,
   getUnits,
+  getPeers,
+  getUnitTypeStatus,
+  getCandidateTypes,
   pairKey,
   findConflicts,
   canPlace,
   placePokemon,
   toggleNote,
+  setNotes,
   undo,
   redo,
   isComplete,
@@ -148,6 +152,121 @@ test("restoring validates board identity, fixed clues, unknown species and malfo
   );
 });
 
+test("remaining types track every row, column and rectangular box, including duplicates", () => {
+  for (const size of [4, 6, 9]) {
+    const puzzle = makePuzzle(pack, catalog, { size, seed: "remaining-types" });
+    const state = newState(puzzle);
+    const units = getUnitTypeStatus(puzzle, state.entries, byId);
+    assert.equal(units.length, size * 3);
+    for (const [i, unit] of units.entries()) {
+      assert.equal(unit.kind, ["row", "column", "box"][Math.floor(i / size)]);
+      assert.equal(unit.index, i % size);
+      assert.deepEqual(unit.cells, getUnits(puzzle)[i]);
+      const used = unit.cells.flatMap(
+        (cell) => byId.get(state.entries[cell])?.types || [],
+      );
+      assert.deepEqual(
+        unit.missing,
+        puzzle.types.filter((t) => !used.includes(t)),
+      );
+      assert.deepEqual(unit.duplicates, []);
+    }
+    state.entries = [...puzzle.representatives];
+    assert.ok(
+      getUnitTypeStatus(puzzle, state.entries, byId).every(
+        (u) => !u.missing.length && !u.duplicates.length,
+      ),
+    );
+    state.entries[0] = state.entries[1];
+    const row = getUnitTypeStatus(puzzle, state.entries, byId)[0];
+    assert.deepEqual(
+      row.missing,
+      [...puzzle.solution[0]].sort((a, b) => a - b),
+    );
+    assert.deepEqual(
+      row.duplicates,
+      [...puzzle.solution[1]].sort((a, b) => a - b),
+    );
+  }
+});
+
+test("candidate notes depend only on peers and actual Pokemon, never the hidden solution", () => {
+  for (const size of [4, 6, 9]) {
+    const puzzle = makePuzzle(pack, catalog, {
+      size,
+      difficulty: "hard",
+      seed: "candidate-types",
+    });
+    const state = newState(puzzle);
+    for (const [index, id] of state.entries.entries()) {
+      if (id !== null) continue;
+      const expected = new Set(
+        catalog.pokemon
+          .filter((p) => canPlace(puzzle, state.entries, byId, index, p.id))
+          .flatMap((p) => p.types),
+      );
+      assert.deepEqual(
+        getCandidateTypes(puzzle, state.entries, byId, index),
+        puzzle.types.filter((t) => expected.has(t)),
+      );
+      assert.deepEqual(
+        getCandidateTypes(
+          { ...puzzle, solution: [] },
+          state.entries,
+          byId,
+          index,
+        ),
+        puzzle.types.filter((t) => expected.has(t)),
+      );
+    }
+    for (const index of [-1, 0.5, size ** 2, puzzle.givens.findIndex(Boolean)])
+      assert.deepEqual(
+        getCandidateTypes(puzzle, state.entries, byId, index),
+        [],
+      );
+  }
+});
+
+test("bulk and manual notes preserve history, persistence and peer pruning", () => {
+  const { puzzle, state } = fixture();
+  const index = state.entries.indexOf(null);
+  const before = JSON.stringify(state);
+  for (const invalid of [
+    -1,
+    0.5,
+    state.entries.length,
+    puzzle.givens.findIndex(Boolean),
+  ]) {
+    assert.equal(setNotes(puzzle, state, invalid, puzzle.types), false);
+    assert.equal(toggleNote(puzzle, state, invalid, puzzle.types[0]), false);
+  }
+  assert.equal(setNotes(puzzle, state, index, [999]), false);
+  assert.equal(JSON.stringify(state), before);
+  const notes = getCandidateTypes(puzzle, state.entries, byId, index);
+  assert.ok(setNotes(puzzle, state, index, [...notes, ...notes]));
+  assert.deepEqual(state.notes[index], notes);
+  assert.equal(setNotes(puzzle, state, index, notes), false);
+  assert.equal(state.undo.length, 1);
+  assert.ok(setNotes(puzzle, state, index, []));
+  undo(state);
+  assert.deepEqual(state.notes[index], notes);
+  redo(state);
+  assert.deepEqual(state.notes[index], []);
+  setNotes(puzzle, state, index, puzzle.types);
+  const peer = [...getPeers(puzzle, index)].find((i) => !puzzle.givens[i]);
+  setNotes(puzzle, state, peer, puzzle.types);
+  placePokemon(puzzle, state, byId, index, puzzle.representatives[index]);
+  assert.deepEqual(state.notes[index], []);
+  assert.deepEqual(
+    state.notes[peer],
+    puzzle.types.filter((t) => !puzzle.solution[index].includes(t)),
+  );
+  undo(state);
+  assert.deepEqual(state.notes[index], puzzle.types);
+  assert.deepEqual(state.notes[peer], puzzle.types);
+  assert.deepEqual(restoreState(JSON.stringify(state), puzzle, byId), state);
+});
+
 test("Korean, initials, English and dex number search work and every sprite is local", () => {
   for (const query of ["이상해씨", "ㅇㅅㅎㅆ", "Bulbasaur", "1"])
     assert.ok(searchPokemon(catalog.pokemon, query).some((p) => p.id === 1));
@@ -155,4 +274,29 @@ test("Korean, initials, English and dex number search work and every sprite is l
     assert.ok(
       existsSync(new URL(`../web/public/sprites/${p.id}.png`, import.meta.url)),
     );
+});
+
+test("all 18 types have distinct, local SVG icons and bundled license credits", () => {
+  const sources = catalog.types.map((type) =>
+    readFileSync(
+      new URL(`../web/src/assets/types/${type.key}.svg`, import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(sources.length, 18);
+  assert.equal(new Set(sources).size, 18);
+  for (const source of sources) {
+    assert.match(source, /<svg\b/);
+    assert.match(source, /viewBox="0 0 256 256"/);
+    assert.doesNotMatch(
+      source,
+      /<script|<foreignObject|\son\w+=|(?:href|src)=/i,
+    );
+  }
+  const notice = readFileSync(
+    new URL("../web/public/NOTICE.txt", import.meta.url),
+    "utf8",
+  );
+  assert.match(notice, /Copyright \(c\) 2022 James Watkins/);
+  assert.match(notice, /MIT License/);
 });

@@ -57,6 +57,45 @@ export function getPeers(puzzle, index) {
   );
 }
 
+export function getUnitTypeStatus(puzzle, entries, byId) {
+  return getUnits(puzzle).map((cells, i) => {
+    const counts = new Map();
+    for (const cell of cells)
+      for (const type of byId.get(entries[cell])?.types || [])
+        counts.set(type, (counts.get(type) || 0) + 1);
+    return {
+      kind: ["row", "column", "box"][Math.floor(i / puzzle.size)],
+      index: i % puzzle.size,
+      cells,
+      missing: puzzle.types.filter((type) => !counts.has(type)),
+      duplicates: puzzle.types.filter((type) => counts.get(type) > 1),
+    };
+  });
+}
+
+export function getCandidateTypes(puzzle, entries, byId, index) {
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= entries.length ||
+    puzzle.givens[index]
+  )
+    return [];
+  const used = new Set(
+    [...getPeers(puzzle, index)].flatMap(
+      (i) => byId.get(entries[i])?.types || [],
+    ),
+  );
+  const available = new Set(puzzle.types.filter((type) => !used.has(type)));
+  // Only suggest types belonging to an actual, locally legal Pokemon pair.
+  const candidates = new Set(
+    [...byId.values()]
+      .filter((p) => p.types.every((type) => available.has(type)))
+      .flatMap((p) => p.types),
+  );
+  return puzzle.types.filter((type) => candidates.has(type));
+}
+
 export function makePuzzle(
   pack,
   catalog,
@@ -186,20 +225,34 @@ export function placePokemon(puzzle, state, byId, index, id) {
   return true;
 }
 
-export function toggleNote(puzzle, state, index, type) {
+export function setNotes(puzzle, state, index, types) {
   if (
+    !Number.isInteger(index) ||
     index < 0 ||
+    index >= state.entries.length ||
     puzzle.givens[index] ||
     state.entries[index] !== null ||
-    !puzzle.types.includes(type)
+    !Array.isArray(types) ||
+    !types.every((type) => puzzle.types.includes(type))
+  )
+    return false;
+  const notes = [...new Set(types)].sort((a, b) => a - b);
+  if (
+    notes.length === state.notes[index].length &&
+    notes.every((type, i) => type === state.notes[index][i])
   )
     return false;
   remember(state);
+  state.notes[index] = notes;
+  return true;
+}
+
+export function toggleNote(puzzle, state, index, type) {
+  if (!puzzle.types.includes(type)) return false;
   const notes = new Set(state.notes[index]);
   if (notes.has(type)) notes.delete(type);
   else notes.add(type);
-  state.notes[index] = [...notes].sort((a, b) => a - b);
-  return true;
+  return setNotes(puzzle, state, index, [...notes]);
 }
 
 export function undo(state) {
