@@ -1,9 +1,18 @@
-Type Sudoku - Data and asset credits
+Pokemon Games - Data and asset credits
 
 Pokemon data: https://pokeapi.co/docs/v2
 Pokemon sprites: https://github.com/PokeAPI/sprites
 Pokemon names and characters belong to Nintendo, Creatures and GAME FREAK.
 This is an unofficial fan project.
+
+Pokemon similarity scores are generated offline with FastEmbed (Apache-2.0)
+and sentence-transformers/all-MiniLM-L6-v2 (Apache-2.0).
+https://github.com/qdrant/fastembed
+https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+The embedding model and runtime are not distributed with the website.
+Pokemon form descriptions are preferred; species descriptions are used when
+form-specific descriptions are unavailable. Missing artwork is not substituted
+with artwork of a different form.
 
 Pokemon Type Icons - MIT License
 https://github.com/partywhale/pokemon-type-icons

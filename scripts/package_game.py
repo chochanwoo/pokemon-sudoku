@@ -14,6 +14,8 @@ with ZipFile(target) as archive:
     assert archive.testzip() is None
     assert "index.html" in archive.namelist()
     assert "sudoku.html" in archive.namelist()
+    assert "pokemantle.html" in archive.namelist()
+    assert "pokemantle-scores.bin" in archive.namelist()
     assert ".nojekyll" in archive.namelist()
     assert not any(name.startswith(("data/", "node_modules/", ".tools/")) for name in archive.namelist())
 print(f"{target.name}: {target.stat().st_size:,} bytes")

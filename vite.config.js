@@ -15,6 +15,9 @@ export default defineConfig({
       input: {
         home: fileURLToPath(new URL("./web/index.html", import.meta.url)),
         sudoku: fileURLToPath(new URL("./web/sudoku.html", import.meta.url)),
+        pokemantle: fileURLToPath(
+          new URL("./web/pokemantle.html", import.meta.url),
+        ),
       },
     },
   },
@@ -38,7 +41,13 @@ export default defineConfig({
           fileName: "catalog.json",
           source: JSON.stringify(catalog),
         });
-        for (const fileName of ["puzzles.json", "NOTICE.txt", ".nojekyll"]) {
+        for (const fileName of [
+          "puzzles.json",
+          "pokemantle.json",
+          "pokemantle-scores.bin",
+          "NOTICE.txt",
+          ".nojekyll",
+        ]) {
           this.emitFile({
             type: "asset",
             fileName,
