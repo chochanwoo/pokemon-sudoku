@@ -30,6 +30,8 @@ const pathFor = (key) => `./pokeclue.html?date=${dateFor(p(key).id)}`;
 async function guess(page, key) {
   await page.locator("#cq-input").fill(key);
   await page.locator(`#cq-options [data-guess="${p(key).id}"]`).click();
+  if (await page.locator("#cq-dialog.trainer-dialog[open]").count())
+    await page.keyboard.press("Escape");
 }
 async function reveal(page) {
   await page.locator('[data-action="give-up"]').click();
@@ -217,14 +219,14 @@ test("eight failed guesses stay playable and a later win receives its earned ran
   for (const key of ["blastoise", "caterpie", "mew"]) await guess(page, key);
   await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
   await expect(page.locator("#cq-count")).toHaveText("11");
-  await expect(page.locator("#cq-grade")).toHaveText("전진급");
+  await expect(page.locator("#cq-grade")).toHaveText("버틀러급");
   await expect(page.locator(".cq-result-rank")).toContainText("11번 만에 정답");
   await page.reload();
   await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
-  await expect(page.locator("#cq-grade")).toHaveText("전진급");
+  await expect(page.locator("#cq-grade")).toHaveText("버틀러급");
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator(".cq-record-result")).toContainText("11회 정답");
-  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText("전진급");
+  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText("버틀러급");
 });
 
 test("legacy automatic losses resume without stale loss records or changes to explicit give-ups", async ({
@@ -260,10 +262,10 @@ test("legacy automatic losses resume without stale loss records or changes to ex
     ),
   ).toEqual([other]);
   await guess(page, "mew");
-  await expect(page.locator("#cq-grade")).toHaveText("난천급");
+  await expect(page.locator("#cq-grade")).toHaveText("버틀러급");
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator(".cq-record-result .cq-rank")).toHaveText([
-    "난천급",
+    "버틀러급",
     "레드급",
   ]);
   await page.evaluate(
@@ -340,14 +342,14 @@ test("long practice rounds persist, receive Joey rank, and render all six named 
       );
       await expect(page.locator(".cq-rank-guide dd")).toHaveText(
         language === "ko"
-          ? ["1~5회", "6~10회", "11~20회", "21~30회", "31~40회", "41회 이상"]
+          ? ["1~3회", "4~5회", "6~8회", "9~11회", "12~15회", "16회 이상"]
           : [
-              "1-5 guesses",
-              "6-10 guesses",
-              "11-20 guesses",
-              "21-30 guesses",
-              "31-40 guesses",
-              "41+ guesses",
+              "1-3 guesses",
+              "4-5 guesses",
+              "6-8 guesses",
+              "9-11 guesses",
+              "12-15 guesses",
+              "16+ guesses",
             ],
       );
       expect(
@@ -391,12 +393,12 @@ test("all six Gen IV characters replace old titles in saved results, records and
     .map((p) => p.id);
   await page.goto(pathFor("mew"));
   for (const [attempts, ko, en] of [
-    [5, "레드급", "Red tier"],
-    [10, "난천급", "Cynthia tier"],
-    [20, "전진급", "Volkner tier"],
-    [30, "버틀러급", "Felix tier"],
-    [40, "모미급", "Cheryl tier"],
-    [41, "오성급", "Joey tier"],
+    [3, "레드급", "Red tier"],
+    [5, "난천급", "Cynthia tier"],
+    [8, "전진급", "Volkner tier"],
+    [11, "버틀러급", "Felix tier"],
+    [15, "모미급", "Cheryl tier"],
+    [16, "오성급", "Joey tier"],
   ]) {
     await page.evaluate(
       ({ key, round, attempts, wrong, day }) => {
@@ -625,6 +627,169 @@ test("cosmetic equivalents count as answers, but regional and Mega forms remain 
   }
   await guess(page, "vulpix-alola");
   await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
+});
+
+test("form generation clues and arrows are corrected in existing rounds, both languages and revealed answers", async ({
+  page,
+}) => {
+  const settings = { mode: "daily", day: dateFor(p("growlithe-hisui").id) };
+  const oldRound = {
+    ...newRound(game, settings),
+    guesses: [p("growlithe").id],
+  };
+  delete oldRound.rulesVersion;
+  await page.goto(pathFor("growlithe-hisui"));
+  await page.evaluate(
+    ({ key, round }) => localStorage.setItem(key, JSON.stringify(round)),
+    { key: storageKey(game, settings), round: oldRound },
+  );
+  await page.reload();
+  const original = page.locator(
+    `[data-result="${p("growlithe").id}"] [data-field="generation"]`,
+  );
+  await expect(original).toContainText("1세대");
+  await expect(original).toHaveAttribute("data-state", "miss");
+  await expect(original).toHaveAttribute("data-direction", "up");
+  for (const [key, generation, state, direction] of [
+    ["vulpix-alola", 7, "miss", "up"],
+    ["meowth-galar", 8, "match", null],
+    ["wooper-paldea", 9, "miss", "down"],
+    ["charizard-mega-x", 1, "miss", "up"],
+    ["charizard-gmax", 1, "miss", "up"],
+  ]) {
+    await guess(page, key);
+    const clue = page.locator(
+      `[data-result="${p(key).id}"] [data-field="generation"]`,
+    );
+    await expect(clue).toContainText(`${generation}세대`);
+    await expect(clue).toHaveAttribute("data-state", state);
+    if (direction)
+      await expect(clue).toHaveAttribute("data-direction", direction);
+  }
+  await page.reload();
+  await expect(page.locator("#cq-count")).toHaveText("6");
+  await page.locator("[data-language-select]").selectOption("en");
+  await expect(original).toContainText("Gen 1");
+  await guess(page, "growlithe-hisui");
+  await expect(page.locator("#cq-answer-title")).toHaveText(
+    "Hisuian Growlithe",
+  );
+  await expect(page.locator(".cq-answer-facts")).toContainText("Gen 8");
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    if (width === 320) {
+      const title = await page.locator("#cq-answer-title").boundingBox();
+      const share = await page
+        .locator('#cq-answer [data-action="share"]')
+        .boundingBox();
+      expect(title.width).toBeGreaterThan(200);
+      expect(share.y).toBeGreaterThanOrEqual(title.y + title.height);
+    }
+    expect(
+      await page
+        .locator("#cq-answer")
+        .evaluate((el) => el.scrollWidth <= el.clientWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `.preview/pokeclue-form-generation-${width}.png`,
+    });
+  }
+});
+
+test("legacy equivalent-form wins retain their rank but cannot win new rounds with a different debut generation", async ({
+  page,
+}) => {
+  const settings = { mode: "daily", day: dateFor(p("unown-a").id) };
+  const oldRound = {
+    ...newRound(game, settings),
+    guesses: [p("unown-exclamation").id],
+  };
+  delete oldRound.rulesVersion;
+  await page.goto(pathFor("unown-a"));
+  await page.evaluate(
+    ({ key, round, day }) => {
+      localStorage.setItem(key, JSON.stringify(round));
+      localStorage.setItem(
+        "pokeclue:records",
+        JSON.stringify([
+          { version: round.version, day, won: true, attempts: 1 },
+        ]),
+      );
+    },
+    { key: storageKey(game, settings), round: oldRound, day: settings.day },
+  );
+  await page.reload();
+  await expect(page.locator("#cq-grade")).toHaveText("레드급");
+  await expect(page.locator("#cq-answer .cq-warning")).toContainText(
+    "이전 세대 기준",
+  );
+  await expect(page.locator("#cq-input")).toBeHidden();
+  await page.reload();
+  await expect(page.locator("#cq-grade")).toHaveText("레드급");
+  await page.locator("[data-language-select]").selectOption("en");
+  await expect(page.locator("#cq-answer .cq-warning")).toContainText(
+    "Your win is preserved",
+  );
+  await page.locator('[data-action="stats"]').click();
+  await expect(page.locator(".cq-record-result")).toContainText("Solved in 1");
+  await page.evaluate(
+    (key) => localStorage.removeItem(key),
+    storageKey(game, settings),
+  );
+  await page.reload();
+  await guess(page, "unown-exclamation");
+  await expect(page.locator("#cq-answer")).toBeHidden();
+  await page.reload();
+  await expect(page.locator("#cq-answer")).toBeHidden();
+  await expect(page.locator("#cq-input")).toBeVisible();
+  await guess(page, "unown-a");
+  await expect(page.locator("#cq-answer-title")).toContainText("Unown");
+  await expect(page.locator("#cq-answer .cq-warning")).toHaveCount(0);
+});
+
+test("Mega and Gmax use species generation in clues, answers and bilingual rules, while old rounds retain guesses", async ({
+  page,
+}) => {
+  await page.goto(pathFor("charizard-mega-x"));
+  await guess(page, "charizard-mega-x");
+  await expect(page.locator(".cq-answer-facts")).toContainText("1세대");
+  await page.locator('[data-action="help"]').click();
+  await expect(page.locator("#cq-dialog-body")).toContainText(
+    "메가진화와 거다이맥스는 원본 포켓몬의 세대를 사용합니다.",
+  );
+  await page.locator('#cq-dialog [data-action="close-dialog"]').click();
+  await page.locator("[data-language-select]").selectOption("en");
+  await page.locator('[data-action="help"]').click();
+  await expect(page.locator("#cq-dialog-body")).toContainText(
+    "Mega Evolutions and Gigantamax forms use the original Pokemon's generation instead.",
+  );
+  await page.locator('#cq-dialog [data-action="close-dialog"]').click();
+  await page.goto(pathFor("charizard"));
+  const settings = { mode: "daily", day: dateFor(p("charizard").id) };
+  const old = {
+    ...newRound(game, settings),
+    rulesVersion: "form-debut",
+    guesses: [p("charizard-gmax").id, p("bulbasaur").id, p("charizard").id],
+  };
+  await page.evaluate(
+    ({ key, round }) => localStorage.setItem(key, JSON.stringify(round)),
+    { key: storageKey(game, settings), round: old },
+  );
+  await page.reload();
+  await expect(page.locator("#cq-answer-title")).toHaveText("Charizard");
+  await expect(page.locator("#cq-count")).toHaveText("3");
+  await expect(page.locator(".cq-answer-facts")).toContainText("Gen 1");
+  const gmax = page.locator(
+    `[data-result="${p("charizard-gmax").id}"] [data-field="generation"]`,
+  );
+  await expect(gmax).toContainText("Gen 1");
+  await expect(gmax).toHaveAttribute("data-state", "match");
+  await page.reload();
+  await expect(page.locator("#cq-count")).toHaveText("3");
+  await page.locator('[data-action="stats"]').click();
+  await expect(
+    page.locator(".cq-record-result").filter({ hasText: "Solved in 3" }),
+  ).toHaveCount(1);
 });
 
 test("Korean midnight offers today's challenge without discarding the previous board", async ({

@@ -63,34 +63,6 @@
 .cq-best strong {
   color: var(--cq-accent);
 }
-.cq-rank {
-  display: inline-grid;
-  place-items: center;
-  max-width: 100%;
-  min-height: 28px;
-  padding: 5px 10px;
-  border-radius: 4px;
-  flex-shrink: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: center;
-  overflow-wrap: anywhere;
-  font-weight: 750;
-  color: #56616e;
-  background: #edf0f4;
-}
-.cq-rank-S {
-  color: #805313;
-  background: #fbf0d9;
-}
-.cq-rank-A {
-  color: #205d4c;
-  background: #e3f2e9;
-}
-.cq-rank-B {
-  color: #315f92;
-  background: #e7effa;
-}
 .cq-result-rank {
   display: flex;
   flex-wrap: wrap;
@@ -100,9 +72,12 @@
   font-size: 14px;
 }
 .cq-result-rank .cq-rank {
-  min-height: 40px;
-  padding: 8px 12px;
-  font-size: 18px;
+  min-height: 48px;
+  font-size: 15px;
+}
+.cq-result-rank .trainer-portrait {
+  width: 48px;
+  height: 48px;
 }
 .cq-record-result {
   display: inline-flex;
@@ -119,35 +94,6 @@
 #cq-dialog .history-list > div > span {
   flex-shrink: 0;
   white-space: nowrap;
-}
-.cq-rank-rules {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-}
-.cq-rank-rules h3 {
-  font-size: 14px;
-}
-.cq-rank-guide {
-  margin: 16px 0 0;
-}
-.cq-rank-guide > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 44px;
-}
-.cq-rank-guide dt {
-  min-width: 0;
-}
-.cq-rank-guide dd {
-  margin: 0;
-  flex-shrink: 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
 }
 .cq-warning {
   padding: 12px 0;
@@ -750,6 +696,9 @@
   .cq-answer-heading {
     gap: 10px;
     flex-wrap: wrap;
+  }
+  .cq-answer-heading > div {
+    flex-basis: calc(100% - 74px);
   }
   .cq-answer-heading > .cq-sprite {
     width: 64px;

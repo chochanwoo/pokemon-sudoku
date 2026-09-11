@@ -1,0 +1,284 @@
+.trainer-tier-S {
+  --trainer-ink: #945f11;
+  --trainer-paper: #fbf0d9;
+  --trainer-edge: #d4aa53;
+}
+.trainer-tier-A {
+  --trainer-ink: #205d4c;
+  --trainer-paper: #e3f2e9;
+  --trainer-edge: #69ad91;
+}
+.trainer-tier-B {
+  --trainer-ink: #315f92;
+  --trainer-paper: #e7effa;
+  --trainer-edge: #85a8d4;
+}
+.trainer-tier-C {
+  --trainer-ink: #71416f;
+  --trainer-paper: #f4e9f3;
+  --trainer-edge: #c399bf;
+}
+.trainer-tier-D {
+  --trainer-ink: #456b35;
+  --trainer-paper: #edf3e7;
+  --trainer-edge: #a6c28b;
+}
+.trainer-tier-E {
+  --trainer-ink: #9a4645;
+  --trainer-paper: #fbeceb;
+  --trainer-edge: #dba09d;
+}
+.trainer-portrait {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+.trainer-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.trainer-image-fallback {
+  display: none;
+}
+.trainer-portrait.is-missing img {
+  display: none;
+}
+.trainer-portrait.is-missing .trainer-image-fallback {
+  display: grid;
+  place-items: center;
+}
+.trainer-image-fallback svg {
+  width: 32px;
+  height: 32px;
+}
+.trainer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 8px 0 2px;
+  border-radius: 4px;
+  color: var(--trainer-ink);
+  background: var(--trainer-paper);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.trainer-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.trainer-replay:hover {
+  color: #292b32;
+}
+.trainer-replay > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.trainer-rank-rules {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.trainer-rank-rules h3 {
+  font-size: 14px;
+}
+.trainer-rank-guide {
+  margin: 16px 0 0;
+}
+.trainer-rank-guide > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+}
+.trainer-rank-guide dt {
+  min-width: 0;
+}
+.trainer-rank-guide dd {
+  margin: 0;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.trainer-dialog {
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px 24px 18px;
+  border: 2px solid #d9dfe5;
+}
+.trainer-dialog[open] {
+  animation: trainer-dialog-enter 180ms ease-out both;
+}
+.trainer-dialog .dialog-header {
+  margin-bottom: 0;
+}
+.trainer-dialog .dialog-header h2 {
+  font-size: 14px;
+  color: #59736d;
+}
+.trainer-award {
+  text-align: center;
+}
+.trainer-context {
+  margin: 8px 0 16px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.trainer-stage {
+  display: grid;
+  place-items: center;
+  height: 176px;
+  margin-inline: -24px;
+  border-block: 1px solid var(--trainer-edge);
+  background: var(--trainer-paper);
+}
+.trainer-stage .trainer-portrait {
+  width: 160px;
+  height: 160px;
+  animation: trainer-arrive 420ms steps(8, end) both;
+}
+.trainer-stage .trainer-image-fallback svg {
+  width: 64px;
+  height: 64px;
+}
+.trainer-kicker {
+  margin: 20px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.trainer-award-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.4;
+  color: var(--trainer-ink);
+  overflow-wrap: anywhere;
+  animation: trainer-title-enter 240ms 150ms ease-out both;
+}
+.trainer-attempts {
+  margin: 8px 0 18px;
+  font-size: 14px;
+  color: #53625d;
+  line-height: 1.5;
+}
+.trainer-answer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding-block: 10px;
+  border-block: 1px solid var(--line);
+  text-align: left;
+}
+.trainer-answer > .pm-sprite,
+.trainer-answer > .cq-sprite {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+}
+.trainer-answer > div {
+  min-width: 0;
+}
+.trainer-answer span:not(.pm-sprite, .cq-sprite) {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.trainer-answer strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.trainer-hints {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.trainer-legacy {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #9a6114;
+  line-height: 1.7;
+}
+.trainer-result-actions {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.trainer-result-actions .primary-button {
+  justify-content: center;
+  min-height: 46px;
+}
+.trainer-result-actions .text-button {
+  min-height: 36px;
+}
+@keyframes trainer-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes trainer-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes trainer-title-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 380px) {
+  .trainer-dialog {
+    padding-inline: 18px;
+  }
+  .trainer-stage {
+    margin-inline: -18px;
+  }
+  .trainer-award-title {
+    font-size: 27px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trainer-dialog[open],
+  .trainer-stage .trainer-portrait,
+  .trainer-award-title {
+    animation: none;
+  }
+}

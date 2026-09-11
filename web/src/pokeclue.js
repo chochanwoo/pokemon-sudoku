@@ -35,11 +35,19 @@ import {
   shareGrid,
   dayKey,
   searchForms,
-  GUESS_RANKS,
   rankFor,
+  GUESS_RANKS,
   FIELDS,
 } from "./clue-engine.js";
 import { siteBrand, languagePicker } from "./site-brand.js";
+import {
+  rankName,
+  trainerBadge,
+  trainerReplay,
+  trainerGuide,
+  trainerResult,
+  onTrainerImageError,
+} from "./trainer-results.js";
 import { t, initLanguage, getLanguage, pokemonName, typeName } from "./i18n.js";
 import "./style.css";
 import "./pokeclue.css";
@@ -117,8 +125,6 @@ let matches = [],
 const refreshIcons = () =>
   createIcons({ icons, attrs: { "stroke-width": 1.8 } });
 const finished = () => isEnded(round, game);
-const rankName = (rank) =>
-  t(GUESS_RANKS.find((tier) => tier.rank === rank).label);
 const localName = (item) =>
   getLanguage() === "ko" ? item.name || item.english : item.english;
 const sprite = (p) =>
@@ -169,7 +175,7 @@ function mount() {
     <main class="main cq-main">
       <div id="cq-new-day" class="cq-day-banner" hidden><span>${t("새로운 오늘의 포켓몬이 도착했어요.")}</span><button class="text-button" data-action="daily">${icon("rotate-cw")}${t("오늘의 문제")}</button></div>
       <section class="cq-heading"><div><div class="eyebrow" id="cq-date"></div><h1>${t("포케클루")}</h1></div><div class="segmented cq-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
-      <section class="cq-progress" aria-label="${t("현재 기록")}"><div><span>${t("추측 횟수")}</span><strong id="cq-used"></strong></div><div class="cq-best"><span>${t("일치한 단서")}</span><strong id="cq-best"></strong></div><div><span>${t("완료 등급")}</span><strong id="cq-grade"></strong></div></section>
+      <section class="cq-progress" aria-label="${t("현재 기록")}"><div><span>${t("추측 횟수")}</span><strong id="cq-used"></strong></div><div class="cq-best"><span>${t("일치한 단서")}</span><strong id="cq-best"></strong></div><div><span>${t("트레이너")}</span><strong id="cq-grade"></strong></div></section>
       <p id="cq-save-warning" class="cq-warning" role="status" hidden>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
       <section id="cq-answer" class="cq-answer" hidden aria-live="polite"></section>
       <section id="cq-search-panel" aria-label="${t("포켓몬 추측")}">
@@ -185,7 +191,11 @@ function mount() {
       <div class="cq-actions"><button id="cq-give-up" class="text-button" data-action="give-up">${icon("flag")}${t("포기")}</button><button id="cq-new-practice" class="text-button" data-action="new-practice" hidden>${icon("rotate-cw")}${t("새 연습")}</button><span id="cq-next" class="cq-next"></span></div>
       <footer class="footer cq-footer"><span>${t("포케클루")} <span class="footer-dot">·</span> ${t("비공식 팬 게임")}</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">${t("데이터 · PokéAPI")} ${icon("arrow-right")}</a></footer>
     </main>
-    <dialog id="cq-dialog"><div class="dialog-header"><h2 id="cq-dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="cq-dialog-body"></div></dialog>`;
+    <dialog id="cq-dialog" aria-labelledby="cq-dialog-title"><div class="dialog-header"><h2 id="cq-dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="cq-dialog-body"></div></dialog>`;
+  app.addEventListener("error", onTrainerImageError, {
+    capture: true,
+    signal: controller.signal,
+  });
   on(document.querySelector("#cq-input"), "input", () => {
     active = -1;
     limit = 30;
@@ -231,12 +241,19 @@ function mount() {
   on(document.querySelector("#cq-dialog"), "click", (event) => {
     if (event.target.id === "cq-dialog") event.target.close();
   });
+  on(document.querySelector("#cq-dialog"), "close", (event) => {
+    if (event.target.classList.contains("trainer-dialog"))
+      document
+        .querySelector('[data-action="trainer-result"]')
+        ?.focus({ preventScroll: true });
+  });
   on(window, "popstate", () => start(settingsFromSearch(location.search)));
   on(window, "pageshow", tick);
   on(document, "visibilitychange", tick);
 }
 
 function start(next, navigate = false) {
+  document.querySelector("#cq-dialog").close();
   settings = next;
   if (settings.mode === "practice")
     save("pokeclue:last-practice", settings.seed);
@@ -252,6 +269,10 @@ function start(next, navigate = false) {
     history.pushState(null, "", url.href);
   }
   round = restoreRound(read(storageKey(game, settings)), game, settings);
+  if (round.rulesVersion === "form-debut" && isWon(round, game)) {
+    save(storageKey(game, settings), round);
+    saveRecord();
+  }
   // The old automatic loss at eight guesses can now continue; explicit give-ups stay final.
   if (settings.mode === "daily" && round.guesses.length === 8 && !finished()) {
     const previous = records();
@@ -344,7 +365,8 @@ function guess(id) {
           attempts: round.guesses.length,
         }),
   );
-  if (finished())
+  if (isWon(round, game)) showTrainerResult();
+  else if (finished())
     document.querySelector("#cq-answer-title").focus({ preventScroll: true });
   else document.querySelector("#cq-input").focus({ preventScroll: true });
 }
@@ -424,7 +446,8 @@ function render() {
   if (finished())
     document.querySelector("#cq-answer").innerHTML = `
     <div class="cq-answer-heading">${sprite(target)}<div><span class="cq-answer-state">${icon(won ? "trophy" : "flag")}${t(won ? "정답!" : "정답 공개")}</span><h2 id="cq-answer-title" tabindex="-1">${esc(pokemonName(target))}</h2></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button></div>
-    ${rank ? `<div class="cq-result-rank"><strong class="cq-rank cq-rank-${rank}">${rankName(rank)}</strong><span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}
+    ${rank ? `<div class="cq-result-rank">${trainerReplay(rank, "cq-rank")}<span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}
+    ${round.legacyWin ? `<p class="cq-warning">${t("이전 세대 기준으로 완료한 기록입니다. 기존 정답 인정은 유지됩니다.")}</p>` : ""}
     <dl class="cq-answer-facts">${FIELDS.map((field) => `<div><dt>${t(labels[field])}</dt><dd>${values(target, field)}</dd></div>`).join("")}</dl>`;
   document.querySelector("#cq-starters").hidden = round.guesses.length > 0;
   document.querySelector("#cq-starters").innerHTML = [1, 4, 7, 25, 133]
@@ -444,12 +467,32 @@ function render() {
   refreshIcons();
 }
 
-function dialog(title, body) {
+function dialog(title, body, celebration = false) {
   closeSuggestions();
+  document
+    .querySelector("#cq-dialog")
+    .classList.toggle("trainer-dialog", celebration);
   document.querySelector("#cq-dialog-title").textContent = t(title);
   document.querySelector("#cq-dialog-body").innerHTML = body;
   refreshIcons();
   document.querySelector("#cq-dialog").showModal();
+}
+
+function showTrainerResult() {
+  if (!isWon(round, game)) return;
+  const target = game.byId.get(round.target);
+  dialog(
+    "도전 완료",
+    trainerResult({
+      attempts: round.guesses.length,
+      ranks: GUESS_RANKS,
+      context: `${t("포케클루")} · ${settings.mode === "practice" ? t("연습") : settings.day}`,
+      answerName: pokemonName(target),
+      answerSprite: sprite(target),
+      legacyWin: round.legacyWin,
+    }),
+    true,
+  );
 }
 function records() {
   try {
@@ -590,6 +633,10 @@ function onClick(event) {
     case "close-dialog":
       document.querySelector("#cq-dialog").close();
       break;
+    case "trainer-result":
+      showTrainerResult();
+      break;
+    case "share-award":
     case "share":
       share();
       break;
@@ -599,19 +646,11 @@ function onClick(event) {
         `<ul class="rules">
       <li>${t("횟수 제한 없이 추측하고, 정답을 맞히기까지 사용한 횟수로 등급을 받습니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.")}</li>
       <li>${t("화살표는 정답을 가리킵니다. 위 화살표는 정답의 값이 더 높고, 아래 화살표는 더 낮다는 뜻입니다.")}</li>
-      <li>${t("진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.")}</li>
+      <li>${t("진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 모습이 처음 등장한 게임의 세대입니다. 예를 들어 가디는 1세대, 히스이 가디는 8세대입니다. 단, 메가진화와 거다이맥스는 원본 포켓몬의 세대를 사용합니다.")}</li>
       <li>${t("특성은 숨겨진 특성을 포함합니다. 미확인 자료는 판정하지 않습니다. 특성 자료가 없거나 다른 종과 모든 단서가 같아 구별할 수 없는 포켓몬은 정답으로 출제하지 않습니다.")}</li>
       <li>${t("메가·리전 폼도 포함합니다. 같은 종에서 모든 단서가 같은 외형 차이는 같은 정답으로 인정하며, 일부 이벤트·기념용 모습은 제외합니다.")}</li>
       <li>${t("데일리는 한국 시간 자정에 바뀝니다. 연습은 데일리 기록과 별개이며, 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>
-      <section class="cq-rank-rules"><h3>${t("등급 기준")}</h3><dl class="cq-rank-guide">${GUESS_RANKS.map(
-        (tier, index) => {
-          const min = index ? GUESS_RANKS[index - 1].max + 1 : 1;
-          const range = Number.isFinite(tier.max)
-            ? t("{min}~{max}회", { min, max: tier.max })
-            : t("{min}회 이상", { min });
-          return `<div><dt><span class="cq-rank cq-rank-${tier.rank}">${t(tier.label)}</span></dt><dd>${range}</dd></div>`;
-        },
-      ).join("")}</dl></section>`,
+      ${trainerGuide("cq-rank-guide", GUESS_RANKS)}`,
       );
       break;
     case "stats": {
@@ -624,7 +663,7 @@ function onClick(event) {
             .slice(0, 8)
             .map(
               (r) =>
-                `<div><span>${esc(r.day)}</span><strong class="cq-record-result">${r.won ? `<span class="cq-rank cq-rank-${rankFor(r.attempts)}">${rankName(rankFor(r.attempts))}</span>` : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
+                `<div><span>${esc(r.day)}</span><strong class="cq-record-result">${r.won ? trainerBadge(rankFor(r.attempts), "cq-rank") : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
             )
             .join("") ||
           `<p class="dialog-copy">${t("아직 완료한 도전이 없어요.")}</p>`
@@ -681,12 +720,16 @@ async function boot() {
 }
 initLanguage("포케클루 | 포켓몬 퀴즈", () => {
   if (!round) return;
+  const showingTrainer = document
+    .querySelector("#cq-dialog")
+    .matches(".trainer-dialog[open]");
   const query = document.querySelector("#cq-input").value;
   clearTimeout(toastTimer);
   mount();
   render();
   document.querySelector("#cq-input").value = query;
   if (query) renderSuggestions();
+  if (showingTrainer) showTrainerResult();
   tick();
 });
 boot();

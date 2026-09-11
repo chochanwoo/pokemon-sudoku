@@ -7,6 +7,7 @@ import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "web" / "public"
+CACHE = ROOT / "data" / "cache" / "pokeapi"
 # Localized names from PokeAPI's data/v2/csv/egg_group_prose.csv.
 EGG_GROUPS = [
     ("monster", "괴수", "Monster"),
@@ -42,6 +43,26 @@ def evolution_info(species):
     return {sid: lineage(sid) for sid in species}
 
 
+def form_debut_generation(form, raw, species, version_groups):
+    if raw.get("id") != form["id"] or raw.get("name") != form["key"]:
+        raise ValueError(f"Mismatched form metadata: {form['key']}")
+    version = (raw.get("version_group") or {}).get("name")
+    generation = version_groups.get(version)
+    if not isinstance(generation, int) or generation < species["generation_id"]:
+        raise ValueError(f"Invalid debut version for {form['key']}: {version}")
+    # These invisible evolution-pattern tags existed with their species, not USUM.
+    if species["id"] in {414, 664, 665}:
+        return species["generation_id"]
+    return generation
+
+
+def form_generation(form, raw, species, version_groups):
+    debut = form_debut_generation(form, raw, species, version_groups)
+    if raw.get("is_mega") or "gmax" in form["key"].split("-"):
+        return species["generation_id"]
+    return debut
+
+
 def build():
     catalog = json.loads((PUBLIC / "pokemantle.json").read_text(encoding="utf-8"))
     path = ROOT / "data" / "build" / "pokemon.db"
@@ -49,6 +70,7 @@ def build():
         db.row_factory = sqlite3.Row
         species = {r["id"]: dict(r) for r in db.execute("SELECT * FROM pokemon_species")}
         pokemon = {r["id"]: dict(r) for r in db.execute("SELECT * FROM pokemon")}
+        version_groups = dict(db.execute("SELECT key,generation_id FROM version_groups"))
         abilities = [dict(r) for r in db.execute(
             "SELECT id,key,name_ko AS name,name_en AS english FROM abilities ORDER BY id")]
         assigned = {}
@@ -66,6 +88,7 @@ def build():
     rows = []
     for form in catalog["pokemon"]:
         p, s = pokemon[form["pokemonId"]], species[form["speciesId"]]
+        raw = json.loads((CACHE / "pokemon-form" / f"{form['id']}.json").read_text(encoding="utf-8"))
         eggs = sorted(filter(None, (s["egg_groups"] or "").split("|")))
         if set(eggs) - groups:
             raise ValueError(f"Unknown egg group: {eggs}")
@@ -73,12 +96,15 @@ def build():
             raise ValueError(f"Invalid form data: {form['key']}")
         rows.append({
             "id": form["id"], "pokemonId": p["id"], "speciesId": s["id"],
-            "generation": s["generation_id"], **evolution[s["id"]],
+            "generation": form_generation(form, raw, s, version_groups),
+            "debutGeneration": form_debut_generation(form, raw, s, version_groups),
+            "speciesGeneration": s["generation_id"], **evolution[s["id"]],
             "abilities": assigned.get(p["id"], []), "eggGroups": eggs,
             "bst": p["base_stat_total"],
         })
     return {
         "version": "pokeclue-v1", "catalogVersion": catalog["version"],
+        "generationBasis": "form-debut-v2",
         "pokemon": rows, "abilities": abilities,
         "eggGroups": [{"key": key, "name": ko, "english": en} for key, ko, en in EGG_GROUPS],
     }

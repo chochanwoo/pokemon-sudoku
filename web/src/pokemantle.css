@@ -494,6 +494,7 @@
 }
 .pm-answer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 18px;
   padding: 20px 0 26px;
@@ -526,6 +527,37 @@
 .pm-answer-types .pm-type {
   width: 23px;
   height: 23px;
+}
+.pm-result-rank {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex-basis: 100%;
+  font-size: 14px;
+}
+.pm-result-rank .trainer-badge {
+  font-size: 15px;
+}
+.pm-result-rank .trainer-portrait {
+  width: 48px;
+  height: 48px;
+}
+.pm-record-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 12px;
+}
+.pm-record-result .trainer-badge {
+  font-size: 11px;
+}
+#pm-dialog .history-list > div > span {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 #pm-toast {
   min-height: 36px;

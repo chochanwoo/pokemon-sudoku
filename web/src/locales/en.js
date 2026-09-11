@@ -1,5 +1,13 @@
 // Korean source messages are the default locale and the translation keys.
 export default {
+  트레이너: "Trainer",
+  "도전 완료": "Challenge complete",
+  "당신의 트레이너 등급": "Your trainer rank",
+  "등급 다시 보기": "View trainer rank",
+  "{rank} · 등급 다시 보기": "{rank} · View trainer rank",
+  "계속 보기": "Continue",
+  "정답을 맞히기까지 사용한 횟수로 트레이너 등급을 받습니다.":
+    "Your trainer rank depends on the number of guesses used to solve the puzzle.",
   "언어 선택": "Language",
   "포켓몬 퀴즈": "Pokemon Quiz",
   "포켓몬 퀴즈 메인으로": "Pokemon Quiz home",
@@ -282,8 +290,10 @@ export default {
     "Guess without a limit. Your rank depends on the number of guesses used to solve the puzzle. Types, abilities and egg groups match when their full sets agree, regardless of order. Shared entries count as partial matches.",
   "화살표는 정답을 가리킵니다. 위 화살표는 정답의 값이 더 높고, 아래 화살표는 더 낮다는 뜻입니다.":
     "Arrows point toward the answer: up means its value is higher; down means it is lower.",
-  "진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.":
-    "Evolution compares both stage and family. A family is a connected evolutionary line, such as Bulbasaur, Ivysaur and Venusaur. Stages start at 1, including baby Pokemon; Mega Evolution does not add a stage. Generation refers to the species' debut.",
+  "진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 모습이 처음 등장한 게임의 세대입니다. 예를 들어 가디는 1세대, 히스이 가디는 8세대입니다. 단, 메가진화와 거다이맥스는 원본 포켓몬의 세대를 사용합니다.":
+    "Evolution compares both stage and family. A family is a connected evolutionary line, such as Bulbasaur, Ivysaur and Venusaur. Stages start at 1, including baby Pokemon; Mega Evolution does not add a stage. Generation refers to the games where that form debuted: Growlithe is Gen 1, but Hisuian Growlithe is Gen 8. Mega Evolutions and Gigantamax forms use the original Pokemon's generation instead.",
+  "이전 세대 기준으로 완료한 기록입니다. 기존 정답 인정은 유지됩니다.":
+    "This round was solved under the previous generation rules. Your win is preserved.",
   "특성은 숨겨진 특성을 포함합니다. 미확인 자료는 판정하지 않습니다. 특성 자료가 없거나 다른 종과 모든 단서가 같아 구별할 수 없는 포켓몬은 정답으로 출제하지 않습니다.":
     "Abilities include hidden abilities. Missing data is not scored. Pokemon with missing ability data, or identical clues to a different species, are not selected as answers.",
   "메가·리전 폼도 포함합니다. 같은 종에서 모든 단서가 같은 외형 차이는 같은 정답으로 인정하며, 일부 이벤트·기념용 모습은 제외합니다.":

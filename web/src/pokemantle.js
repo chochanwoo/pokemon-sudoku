@@ -32,6 +32,15 @@ import {
   proximityFor,
 } from "./similarity-engine.js";
 import { siteBrand, languagePicker } from "./site-brand.js";
+import { rankFor } from "./trainer-ranks.js";
+import {
+  rankName,
+  trainerBadge,
+  trainerReplay,
+  trainerGuide,
+  trainerResult,
+  onTrainerImageError,
+} from "./trainer-results.js";
 import {
   t,
   locale,
@@ -183,7 +192,11 @@ function mount() {
       <div class="pm-game-actions"><div><button class="text-button pm-hint" data-action="hint">${icon("lightbulb")}<span id="hint-label">${t("힌트 {count}/{max}", { count: 0, max: MAX_HINTS })}</span></button><button class="text-button" data-action="give-up">${icon("flag")}${t("포기")}</button></div><span id="next-puzzle" class="pm-next"></span></div>
       <footer class="footer pm-footer"><span>${t("포맨틀")} <span class="footer-dot">·</span> ${t("비공식 팬 게임")}</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">${t("데이터 · PokéAPI")} ${icon("arrow-right")}</a></footer>
     </main>
-    <dialog id="pm-dialog"><div class="dialog-header"><h2 id="pm-dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="pm-dialog-body"></div></dialog>`;
+    <dialog id="pm-dialog" aria-labelledby="pm-dialog-title"><div class="dialog-header"><h2 id="pm-dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="pm-dialog-body"></div></dialog>`;
+  app.addEventListener("error", onTrainerImageError, {
+    capture: true,
+    signal: mountController.signal,
+  });
   on(document.querySelector("#guess-input"), "input", () => {
     active = -1;
     limit = 40;
@@ -235,11 +248,18 @@ function mount() {
   on(document.querySelector("#pm-dialog"), "click", (event) => {
     if (event.target.id === "pm-dialog") event.target.close();
   });
+  on(document.querySelector("#pm-dialog"), "close", (event) => {
+    if (event.target.classList.contains("trainer-dialog"))
+      document
+        .querySelector('[data-action="trainer-result"]')
+        ?.focus({ preventScroll: true });
+  });
   on(document, "visibilitychange", tick);
   on(window, "pageshow", tick);
 }
 
 function start(day) {
+  document.querySelector("#pm-dialog").close();
   clearTimeout(toastTimer);
   document.querySelector("#pm-toast").textContent = "";
   document.querySelector("#pm-toast").classList.remove("visible");
@@ -352,7 +372,8 @@ function guess(id, hint = false) {
   );
   if (ended()) {
     saveRecord();
-    document.querySelector("#answer-title").focus({ preventScroll: true });
+    if (isWon(round, target)) showTrainerResult();
+    else document.querySelector("#answer-title").focus({ preventScroll: true });
   } else document.querySelector("#guess-input").focus({ preventScroll: true });
 }
 
@@ -377,7 +398,7 @@ function render() {
   if (ended()) {
     const p = game.byId.get(target);
     document.querySelector("#answer-panel").innerHTML =
-      `${sprite(p)}<div class="pm-answer-details"><span>${t(isWon(round, target) ? "정답!" : "오늘의 정답")}</span><h2 id="answer-title" tabindex="-1">${esc(pokemonName(p))}</h2><div class="pm-answer-types">${badges(p)}</div></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button>`;
+      `${sprite(p)}<div class="pm-answer-details"><span>${t(isWon(round, target) ? "정답!" : "오늘의 정답")}</span><h2 id="answer-title" tabindex="-1">${esc(pokemonName(p))}</h2><div class="pm-answer-types">${badges(p)}</div></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button>${isWon(round, target) ? `<div class="pm-result-rank">${trainerReplay(rankFor(round.guesses.length))}<span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}`;
   }
   document.querySelector("#first-guesses").hidden = round.guesses.length > 0;
   document.querySelector("#first-guesses").innerHTML = [1, 6, 25, 94, 131]
@@ -491,12 +512,31 @@ function renderHistory() {
   refreshIcons();
 }
 
-function dialog(title, body) {
+function dialog(title, body, celebration = false) {
   closeSuggestions();
+  document
+    .querySelector("#pm-dialog")
+    .classList.toggle("trainer-dialog", celebration);
   document.querySelector("#pm-dialog-title").textContent = t(title);
   document.querySelector("#pm-dialog-body").innerHTML = body;
   refreshIcons();
   document.querySelector("#pm-dialog").showModal();
+}
+
+function showTrainerResult() {
+  if (!isWon(round, target)) return;
+  const p = game.byId.get(target);
+  dialog(
+    "도전 완료",
+    trainerResult({
+      attempts: round.guesses.length,
+      context: `${t("포맨틀")} · ${round.day}`,
+      answerName: pokemonName(p),
+      answerSprite: sprite(p),
+      hints: hints(),
+    }),
+    true,
+  );
 }
 
 function records() {
@@ -535,7 +575,7 @@ async function share() {
   url.search = "";
   url.hash = "";
   url.searchParams.set("date", round.day);
-  const text = `${t("포맨틀")} ${round.day}\n${isWon(round, target) ? t("{count}번 만에 정답", { count: round.guesses.length }) : t("도전 종료")} · ${t("힌트 {count}회", { count: hints() })}\n${url.href}`;
+  const text = `${t("포맨틀")} ${round.day}\n${isWon(round, target) ? t("{rank} · {count}번 만에 정답", { rank: rankName(rankFor(round.guesses.length)), count: round.guesses.length }) : t("도전 종료")} · ${t("힌트 {count}회", { count: hints() })}\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
       await navigator.share({ title: t("포맨틀"), text });
@@ -612,6 +652,10 @@ function onClick(event) {
     case "close-dialog":
       document.querySelector("#pm-dialog").close();
       break;
+    case "trainer-result":
+      showTrainerResult();
+      break;
+    case "share-award":
     case "share":
       share();
       break;
@@ -622,7 +666,7 @@ function onClick(event) {
     case "help":
       dialog(
         "포맨틀 규칙",
-        `<ul class="rules"><li>${t("하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 리전 폼·메가진화 등은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>`,
+        `<ul class="rules"><li>${t("하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 리전 폼·메가진화 등은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("정답을 맞히기까지 사용한 횟수로 트레이너 등급을 받습니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>${trainerGuide()}`,
       );
       break;
     case "stats": {
@@ -635,7 +679,7 @@ function onClick(event) {
             .slice(0, 8)
             .map(
               (r) =>
-                `<div><span>${esc(r.day)}<small>${t("힌트 {count}회", { count: r.hints || 0 })}</small></span><strong>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</strong></div>`,
+                `<div><span>${esc(r.day)}<small>${t("힌트 {count}회", { count: r.hints || 0 })}</small></span><strong class="pm-record-result">${r.won ? trainerBadge(rankFor(r.attempts)) : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
             )
             .join("") ||
           `<p class="dialog-copy">${t("아직 완료한 도전이 없어요.")}</p>`
@@ -697,6 +741,9 @@ async function boot() {
 }
 initLanguage("포맨틀 | 포켓몬 퀴즈", () => {
   if (!round) return;
+  const showingTrainer = document
+    .querySelector("#pm-dialog")
+    .matches(".trainer-dialog[open]");
   const query = document.querySelector("#guess-input").value;
   const rankingQuery = document.querySelector("#ranking-search").value;
   clearTimeout(toastTimer);
@@ -706,6 +753,7 @@ initLanguage("포맨틀 | 포켓몬 퀴즈", () => {
   render();
   document.querySelector("#guess-input").value = query;
   if (query) renderSuggestions();
+  if (showingTrainer) showTrainerResult();
   tick();
 });
 boot();

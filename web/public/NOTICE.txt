@@ -5,6 +5,15 @@ Pokemon sprites: https://github.com/PokeAPI/sprites
 Pokemon names and characters belong to Nintendo, Creatures and GAME FREAK.
 This is an unofficial fan project.
 
+Trainer sprites: https://play.pokemonshowdown.com/sprites/trainers/
+Bundled unchanged: red.png (Red, HGSS), cynthia-gen4.png (Cynthia, DPPt),
+volkner.png (Volkner), cheryl.png (Cheryl), acetrainer-gen4dp.png
+(DP male Ace Trainer, used by Felix/Butler), youngster-gen4.png
+(HGSS Youngster, used by Joey).
+These are game sprites, not original artwork created for this project.
+Original character and sprite rights remain with Nintendo, Creatures and
+GAME FREAK; the hosting project does not grant rights to Pokemon artwork.
+
 Pokemon similarity scores are generated offline with FastEmbed (Apache-2.0)
 and sentence-transformers/all-MiniLM-L6-v2 (Apache-2.0).
 https://github.com/qdrant/fastembed

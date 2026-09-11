@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import english from "../web/src/locales/en.js";
 import {
+  GUESS_RANKS as MANTLE_RANKS,
+  rankFor as mantleRankFor,
+} from "../web/src/trainer-ranks.js";
+import {
   createClueGame,
   compareSet,
   compareNumber,
@@ -45,7 +49,7 @@ function settingsFor(id) {
   throw new Error("No date for answer");
 }
 
-test("clues use actual form stats and abilities, with species-wide debut and baby-inclusive evolution", () => {
+test("clues use actual form stats, abilities and debut with baby-inclusive evolution", () => {
   assert.equal(game.pokemon.length, 1559);
   assert.deepEqual(p("charizard-mega-x").types, [10, 16]);
   assert.equal(p("charizard").bst, 534);
@@ -61,6 +65,174 @@ test("clues use actual form stats and abilities, with species-wide debut and bab
   assert.deepEqual(p("ditto").eggGroups, ["ditto"]);
   assert.ok(p("bulbasaur").abilities.some((a) => a.hidden));
   assert.notDeepEqual(p("vulpix").abilities, p("vulpix-alola").abilities);
+});
+
+test("form debut is correct across regional, Mega, Gigantamax and late alternate forms", () => {
+  for (const [key, generation] of [
+    ["growlithe", 1],
+    ["growlithe-hisui", 8],
+    ["arcanine-hisui", 8],
+    ["vulpix-alola", 7],
+    ["meowth-galar", 8],
+    ["wooper-paldea", 9],
+    ["charizard", 1],
+    ["charizard-mega-x", 1],
+    ["charizard-gmax", 1],
+    ["dragonite-mega", 1],
+    ["lucario-mega", 4],
+    ["rillaboom-gmax", 8],
+    ["kyogre-primal", 6],
+    ["dialga-origin", 8],
+    ["palkia-origin", 8],
+    ["ursaluna-bloodmoon", 9],
+    ["unown-a", 2],
+    ["unown-exclamation", 3],
+    ["arceus-fairy", 6],
+    ["mothim-sandy", 4],
+    ["scatterbug-polar", 6],
+    ["spewpa-polar", 6],
+  ])
+    assert.equal(p(key).generation, generation, key);
+  for (const [region, generation] of [
+    ["alola", 7],
+    ["galar", 8],
+    ["hisui", 8],
+    ["paldea", 9],
+  ]) {
+    const forms = game.pokemon.filter((p) => p.key.split("-").includes(region));
+    assert.ok(forms.length > 0);
+    assert.ok(
+      forms.every((p) => p.generation === generation),
+      region,
+    );
+  }
+  assert.deepEqual(
+    comparePokemon(p("growlithe"), p("growlithe-hisui")).generation,
+    { state: "miss", direction: "up" },
+  );
+  assert.equal(
+    comparePokemon(p("growlithe-hisui"), p("arcanine-hisui")).generation.state,
+    "match",
+  );
+  assert.notEqual(answerKey(p("unown-a")), answerKey(p("unown-exclamation")));
+  assert.equal(answerKey(p("charizard")), answerKey(p("charizard-gmax")));
+  for (const form of game.pokemon.filter((p) =>
+    p.key.split("-").some((key) => ["mega", "gmax"].includes(key)),
+  )) {
+    assert.equal(form.generation, form.speciesGeneration, form.key);
+  }
+  assert.deepEqual(
+    comparePokemon(p("charizard-mega-x"), p("charizard")).generation,
+    { state: "match", direction: null },
+  );
+  assert.notEqual(answerKey(p("charizard-mega-x")), answerKey(p("charizard")));
+});
+
+test("corrected clues preserve every v1 daily target and practice seed", () => {
+  const legacyGame = createClueGame(catalog, {
+    ...clues,
+    generationBasis: "species-debut",
+    pokemon: clues.pokemon.map((p) => ({
+      ...p,
+      generation: p.speciesGeneration,
+    })),
+  });
+  assert.equal(game.answers.length, 1264);
+  assert.deepEqual(
+    game.answers.map((p) => p.id),
+    legacyGame.answers.map((p) => p.id),
+  );
+  for (let i = 0; i < game.answers.length; i++) {
+    const settings = {
+      mode: "daily",
+      day: new Date(Date.parse("2026-01-01") + i * 86400000)
+        .toISOString()
+        .slice(0, 10),
+    };
+    assert.equal(game.targetFor(settings), legacyGame.targetFor(settings));
+    const practice = { mode: "practice", seed: `existing-${i}` };
+    assert.equal(game.targetFor(practice), legacyGame.targetFor(practice));
+  }
+});
+
+test("old equivalent-form wins remain completed, but new guesses use the corrected clues", () => {
+  const settings = settingsFor(p("unown-a").id);
+  const fresh = newRound(game, settings);
+  const oldWin = { ...fresh, guesses: [p("unown-exclamation").id] };
+  delete oldWin.rulesVersion;
+  const restored = restoreRound(JSON.stringify(oldWin), game, settings);
+  assert.deepEqual(restored.guesses, oldWin.guesses);
+  assert.equal(restored.legacyWin, true);
+  assert.equal(isWon(restored, game), true);
+  assert.equal(submitGuess(restored, game, p("unown-a").id), "finished");
+  assert.deepEqual(
+    restoreRound(JSON.stringify(restored), game, settings),
+    restored,
+  );
+  assert.deepEqual(
+    restoreRound(
+      JSON.stringify({ ...oldWin, guesses: [...oldWin.guesses, 1] }),
+      game,
+      settings,
+    ),
+    fresh,
+  );
+  const current = newRound(game, settings);
+  submitGuess(current, game, p("unown-exclamation").id);
+  assert.equal(isWon(current, game), false);
+  assert.deepEqual(
+    restoreRound(JSON.stringify(current), game, settings),
+    current,
+  );
+  submitGuess(current, game, p("unown-a").id);
+  assert.equal(isWon(current, game), true);
+});
+
+test("Mega and Gmax generation updates preserve old history and recognize newly matching answers", () => {
+  const settings = settingsFor(p("charizard").id);
+  for (const saved of [
+    { guesses: [p("charizard-gmax").id], gaveUp: false },
+    { guesses: [p("charizard-gmax").id, 1, p("charizard").id], gaveUp: false },
+    { guesses: [p("charizard-gmax").id, 1], gaveUp: true },
+  ]) {
+    const old = {
+      ...newRound(game, settings),
+      ...saved,
+      rulesVersion: "form-debut",
+    };
+    const restored = restoreRound(JSON.stringify(old), game, settings);
+    assert.deepEqual(restored.guesses, old.guesses);
+    assert.equal(restored.gaveUp, false);
+    assert.equal(isWon(restored, game), true);
+    assert.equal(rankFor(restored.guesses.length), rankFor(old.guesses.length));
+    assert.deepEqual(
+      restoreRound(JSON.stringify(restored), game, settings),
+      restored,
+    );
+  }
+  const unfinishedSettings = settingsFor(p("growlithe-hisui").id);
+  const old = {
+    ...newRound(game, unfinishedSettings),
+    rulesVersion: "form-debut",
+    guesses: [p("charizard-gmax").id, p("charizard").id],
+  };
+  const restored = restoreRound(JSON.stringify(old), game, unfinishedSettings);
+  assert.deepEqual(restored.guesses, old.guesses);
+  assert.equal(isWon(restored, game), false);
+  assert.equal(submitGuess(restored, game, p("charizard").id), "duplicate");
+  assert.equal(submitGuess(restored, game, p("growlithe-hisui").id), "ok");
+  assert.deepEqual(
+    restoreRound(JSON.stringify(restored), game, unfinishedSettings),
+    restored,
+  );
+  const invalid = {
+    ...old,
+    guesses: [p("charizard-gmax").id, p("charizard-gmax").id],
+  };
+  assert.deepEqual(
+    restoreRound(JSON.stringify(invalid), game, unfinishedSettings),
+    newRound(game, unfinishedSettings),
+  );
 });
 
 test("set comparisons ignore order and hidden slots, distinguish partial matches and never match missing data", () => {
@@ -179,6 +351,38 @@ test("ranks follow attempts used with inclusive boundaries and reject invalid co
   );
   for (const [count, rank] of [
     [1, "S"],
+    [3, "S"],
+    [4, "A"],
+    [5, "A"],
+    [6, "B"],
+    [8, "B"],
+    [9, "C"],
+    [11, "C"],
+    [12, "D"],
+    [15, "D"],
+    [16, "E"],
+    [1559, "E"],
+  ])
+    assert.equal(rankFor(count), rank);
+  for (const count of [0, -1, 1.5, NaN, Infinity, null, "5"])
+    assert.equal(rankFor(count), null);
+});
+
+test("PokeClue's tighter rank cutoffs do not change Pokemantle's ranks", () => {
+  assert.deepEqual(
+    MANTLE_RANKS.map((tier) => tier.max),
+    [5, 10, 20, 30, 40, Infinity],
+  );
+  assert.deepEqual(
+    GUESS_RANKS.map((tier) => tier.max),
+    [3, 5, 8, 11, 15, Infinity],
+  );
+  assert.deepEqual(
+    GUESS_RANKS.map(({ max, ...trainer }) => trainer),
+    MANTLE_RANKS.map(({ max, ...trainer }) => trainer),
+  );
+  for (const [attempts, expected] of [
+    [1, "S"],
     [5, "S"],
     [6, "A"],
     [10, "A"],
@@ -189,11 +393,11 @@ test("ranks follow attempts used with inclusive boundaries and reject invalid co
     [31, "D"],
     [40, "D"],
     [41, "E"],
-    [1559, "E"],
-  ])
-    assert.equal(rankFor(count), rank);
+  ]) {
+    assert.equal(mantleRankFor(attempts), expected);
+  }
   for (const count of [0, -1, 1.5, NaN, Infinity, null, "5"])
-    assert.equal(rankFor(count), null);
+    assert.equal(mantleRankFor(count), null);
 });
 
 test("wrong guesses never end a round, including beyond eight and thirty attempts", () => {
@@ -229,7 +433,7 @@ test("legacy eighth-attempt losses resume while eighth-attempt wins and explicit
   assert.deepEqual(round, saved);
   assert.equal(isEnded(round, game), false);
   assert.equal(submitGuess(round, game, round.target), "ok");
-  assert.equal(rankFor(round.guesses.length), "A");
+  assert.equal(rankFor(round.guesses.length), "C");
   assert.equal(submitGuess(round, game, round.target), "finished");
   for (const finished of [
     { ...saved, gaveUp: true },
@@ -264,6 +468,7 @@ test("storage validates identity, duplicate groups, early wins, catalog bounds a
     "{",
     "null",
     JSON.stringify({ ...round, version: "wrong" }),
+    JSON.stringify({ ...round, rulesVersion: "unknown-rules" }),
     JSON.stringify({ ...round, target: 1 }),
     JSON.stringify({ ...round, guesses: [10057] }),
     JSON.stringify({ ...round, guesses: [1, 1] }),

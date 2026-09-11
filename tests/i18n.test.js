@@ -53,6 +53,7 @@ test("translations preserve placeholders and cover literal UI message keys", () 
     "pokemantle.js",
     "pokeclue.js",
     "site-brand.js",
+    "trainer-results.js",
   ]) {
     const source = read(`../web/src/${file}`);
     for (const [, key] of source.matchAll(

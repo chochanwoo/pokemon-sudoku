@@ -34,6 +34,8 @@ async function guess(page, key) {
     .getByRole("combobox", { name: "포켓몬 이름 또는 도감 번호" })
     .fill(key);
   await page.locator(`#guess-options [data-guess="${pokemon.id}"]`).click();
+  if (await page.locator("#pm-dialog.trainer-dialog[open]").count())
+    await page.keyboard.press("Escape");
 }
 
 test("regional forms are distinct answers; keyboard guessing, duplicate prevention, save and spoiler-free sharing work", async ({
@@ -79,6 +81,10 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   await expect(page.locator("#best-score")).toHaveText("100.00");
   await expect(page.locator("#best-rank")).toHaveText("1위");
   await expect(input).toBeHidden();
+  await expect(page.locator("#pm-dialog .trainer-award-title")).toHaveText(
+    "레드급",
+  );
+  await page.keyboard.press("Escape");
   await page.evaluate(() =>
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -495,7 +501,7 @@ test("new weights rescore existing guesses without changing today's answer, and 
     page.getByRole("heading", { name: "포맨틀 규칙" }),
   ).toBeVisible();
   const help = page.locator("#pm-dialog-body");
-  await expect(help.getByRole("listitem")).toHaveCount(4);
+  await expect(help.getByRole("listitem")).toHaveCount(5);
   for (const rule of [
     "정확한 모습",
     "100점, 1위",

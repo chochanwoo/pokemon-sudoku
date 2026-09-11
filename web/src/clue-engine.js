@@ -1,20 +1,14 @@
 import { hash, random, shuffle, dayKey } from "./engine.js";
 import { isPlayableForm } from "./form-policy.js";
 import { validDay, resolveDay, searchForms } from "./similarity-engine.js";
+import {
+  CLUE_GUESS_RANKS,
+  rankFor as trainerRankFor,
+} from "./trainer-ranks.js";
 
 export { dayKey, searchForms };
-export const GUESS_RANKS = [
-  { rank: "S", max: 5, label: "레드급" },
-  { rank: "A", max: 10, label: "난천급" },
-  { rank: "B", max: 20, label: "전진급" },
-  { rank: "C", max: 30, label: "버틀러급" },
-  { rank: "D", max: 40, label: "모미급" },
-  { rank: "E", max: Infinity, label: "오성급" },
-];
-export function rankFor(attempts) {
-  if (!Number.isInteger(attempts) || attempts < 1) return null;
-  return GUESS_RANKS.find((tier) => attempts <= tier.max).rank;
-}
+export { CLUE_GUESS_RANKS as GUESS_RANKS } from "./trainer-ranks.js";
+export const rankFor = (attempts) => trainerRankFor(attempts, CLUE_GUESS_RANKS);
 export const FIELDS = [
   "types",
   "abilities",
@@ -38,6 +32,8 @@ export function clueKey(p) {
   ]);
 }
 export const answerKey = (p) => `${p.speciesId}:${clueKey(p)}`;
+const originalClues = (p) => ({ ...p, generation: p.speciesGeneration });
+const originalAnswerKey = (p) => answerKey(originalClues(p));
 
 export function createClueGame(catalog, clues) {
   if (
@@ -60,9 +56,14 @@ export function createClueGame(catalog, clues) {
         !details ||
         details.pokemonId !== p.pokemonId ||
         details.speciesId !== p.speciesId ||
-        ![details.stage, details.family, details.generation, details.bst].every(
-          (n) => Number.isInteger(n) && n > 0,
-        ) ||
+        ![
+          details.stage,
+          details.family,
+          details.generation,
+          details.debutGeneration ?? details.generation,
+          details.speciesGeneration ?? details.generation,
+          details.bst,
+        ].every((n) => Number.isInteger(n) && n > 0) ||
         !Array.isArray(details.abilities) ||
         !Array.isArray(details.eggGroups) ||
         details.abilities.some(
@@ -71,22 +72,31 @@ export function createClueGame(catalog, clues) {
         details.eggGroups.some((g) => !eggSet.has(g))
       )
         throw new Error("Invalid Pokemon clues");
-      return { ...p, ...details };
+      return {
+        ...p,
+        ...details,
+        speciesGeneration: details.speciesGeneration ?? details.generation,
+        debutGeneration: details.debutGeneration ?? details.generation,
+      };
     })
     .sort((a, b) => a.id - b.id);
   const byId = new Map(pokemon.map((p) => [p.id, p]));
   if (byId.size !== pokemon.length) throw new Error("Duplicate form IDs");
-  // Cosmetic duplicates cannot be distinguished by these clues; draw each group once.
+  // Keep v1's original draw pool and seeded targets when generation rules change.
   const groups = new Map();
-  for (const p of pokemon)
+  for (const entry of pokemon) {
+    const p = originalClues(entry);
     if (p.abilities.length && p.eggGroups.length && !groups.has(answerKey(p)))
       groups.set(answerKey(p), p);
+  }
   const candidates = [...groups.values()];
   const clueCounts = new Map();
   for (const p of candidates)
     clueCounts.set(clueKey(p), (clueCounts.get(clueKey(p)) || 0) + 1);
   // Different species with identical visible clues (e.g. Silcoon/Cascoon) remain guesses, not answers.
-  const answers = candidates.filter((p) => clueCounts.get(clueKey(p)) === 1);
+  const answers = candidates
+    .filter((p) => clueCounts.get(clueKey(p)) === 1)
+    .map((p) => byId.get(p.id));
   if (!answers.length) throw new Error("No complete answers");
   const version = clues.version;
   const schedule = shuffle(answers, random(hash(version)));
@@ -105,7 +115,14 @@ export function createClueGame(catalog, clues) {
     return schedule[((n % schedule.length) + schedule.length) % schedule.length]
       .id;
   };
-  return { version, pokemon, byId, answers, targetFor };
+  return {
+    version,
+    rulesVersion: clues.generationBasis || "species-debut",
+    pokemon,
+    byId,
+    answers,
+    targetFor,
+  };
 }
 
 export function compareSet(guess, target) {
@@ -171,6 +188,7 @@ export const storageKey = (game, settings) =>
 export function newRound(game, settings) {
   return {
     version: game.version,
+    rulesVersion: game.rulesVersion,
     challenge: challengeKey(settings),
     target: game.targetFor(settings),
     guesses: [],
@@ -179,8 +197,15 @@ export function newRound(game, settings) {
 }
 export function isWon(round, game) {
   const target = game.byId.get(round.target);
-  return round.guesses.some(
+  const currentWin = round.guesses.some(
     (id) => answerKey(game.byId.get(id)) === answerKey(target),
+  );
+  return (
+    currentWin ||
+    (round.legacyWin === true &&
+      round.guesses.length > 0 &&
+      originalAnswerKey(game.byId.get(round.guesses.at(-1))) ===
+        originalAnswerKey(target))
   );
 }
 export const isEnded = (round, game) => round.gaveUp || isWon(round, game);
@@ -204,6 +229,9 @@ export function restoreRound(raw, game, settings) {
     if (
       !saved ||
       saved.version !== clean.version ||
+      ![undefined, "species-debut", "form-debut", game.rulesVersion].includes(
+        saved.rulesVersion,
+      ) ||
       saved.challenge !== clean.challenge ||
       saved.target !== clean.target ||
       typeof saved.gaveUp !== "boolean" ||
@@ -212,10 +240,42 @@ export function restoreRound(raw, game, settings) {
     )
       return clean;
     const restored = newRound(game, settings);
+    // Validate old history under its rules, including now-equivalent Gmax guesses.
+    const replayGame =
+      saved.rulesVersion === "form-debut"
+        ? {
+            ...game,
+            byId: new Map(
+              game.pokemon.map((p) => [
+                p.id,
+                { ...p, generation: p.debutGeneration },
+              ]),
+            ),
+          }
+        : game;
     for (const id of saved.guesses)
-      if (submitGuess(restored, game, id) !== "ok") return clean;
-    if (saved.gaveUp && isWon(restored, game)) return clean;
-    restored.gaveUp = saved.gaveUp;
+      if (submitGuess(restored, replayGame, id) !== "ok") return clean;
+    // Honor wins earned when same-species forms shared the species' debut clue.
+    const legacy =
+      saved.rulesVersion === undefined ||
+      saved.rulesVersion === "species-debut" ||
+      saved.legacyWin === true;
+    if (legacy && !isWon(restored, game)) {
+      const winner = restored.guesses.findIndex(
+        (id) =>
+          originalAnswerKey(game.byId.get(id)) ===
+          originalAnswerKey(game.byId.get(restored.target)),
+      );
+      if (winner >= 0) {
+        if (winner !== restored.guesses.length - 1 || saved.gaveUp)
+          return clean;
+        restored.legacyWin = true;
+      } else if (saved.legacyWin === true) return clean;
+    }
+    if (saved.gaveUp && isWon(restored, replayGame)) return clean;
+    restored.gaveUp = saved.gaveUp && !isWon(restored, game);
+    if (saved.rulesVersion === "form-debut")
+      restored.rulesVersion = "form-debut";
     return restored;
   } catch {
     return clean;
