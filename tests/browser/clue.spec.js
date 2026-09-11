@@ -6,6 +6,7 @@ import {
   FIELDS,
   settingsFromSearch,
   storageKey,
+  newRound,
 } from "../../web/src/clue-engine.js";
 
 const read = (file) =>
@@ -100,7 +101,8 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   await page.locator("#cq-input").press("ArrowDown");
   await page.locator("#cq-input").press("Enter");
   const row = page.locator('[data-result="1"]');
-  await expect(page.locator("#cq-remaining")).toHaveText("7");
+  await expect(page.locator("#cq-used")).toHaveText("1");
+  await expect(page.locator("#cq-grade")).toHaveText("-");
   const feedback = comparePokemon(p("bulbasaur"), p("ivysaur"));
   for (const field of FIELDS)
     await expect(row.locator(`[data-field="${field}"]`)).toHaveAttribute(
@@ -139,6 +141,8 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   );
   await guess(page, "ivysaur");
   await expect(page.locator("#cq-answer-title")).toHaveText("Ivysaur");
+  await expect(page.locator("#cq-grade")).toHaveText("Red tier");
+  await expect(page.locator(".cq-result-rank .cq-rank")).toHaveText("Red tier");
   await expect(page.locator("#cq-input")).toBeHidden();
   await expect(page.locator("#cq-answer .cq-answer-facts > div")).toHaveCount(
     6,
@@ -156,7 +160,8 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   await page.locator('[data-action="share"]').click();
   const text = await page.evaluate(() => window.clueShare);
   expect(text).toContain("PokeClue");
-  expect(text).toContain("2/8");
+  expect(text).toContain("Red tier · Solved in 2 guesses");
+  expect(text).not.toContain("/8");
   expect(text).toContain("O O O O O O");
   expect(text).not.toContain("Ivysaur");
   expect(text).not.toContain("Bulbasaur");
@@ -166,6 +171,16 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   await expect(page.locator("#cq-answer-title")).toHaveText("Ivysaur");
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator("#cq-dialog-body")).toContainText("Solved in 2");
+  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText(
+    "Red tier",
+  );
+  await page.setViewportSize({ width: 320, height: 844 });
+  expect(
+    await page
+      .locator(".history-list")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+  await page.screenshot({ path: ".preview/pokeclue-rank-stats-en-320.png" });
   expect(errors).toEqual([]);
   expect(requests.every((url) => new URL(url).hostname === "127.0.0.1")).toBe(
     true,
@@ -175,7 +190,7 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   );
 });
 
-test("all eight failed guesses reveal the answer and a correct eighth guess wins", async ({
+test("eight failed guesses stay playable and a later win receives its earned rank", async ({
   page,
 }) => {
   await page.goto(pathFor("mew"));
@@ -190,31 +205,287 @@ test("all eight failed guesses reveal the answer and a correct eighth guess wins
     "wartortle",
   ])
     await guess(page, key);
-  await expect(page.locator("#cq-remaining")).toHaveText("0");
+  await expect(page.locator("#cq-used")).toHaveText("8");
   await expect(page.locator("#cq-count")).toHaveText("8");
-  await expect(page.locator("#cq-answer-title")).toHaveText("뮤");
+  await expect(page.locator("#cq-answer")).toBeHidden();
+  await expect(page.locator("#cq-grade")).toHaveText("-");
+  await expect(page.locator("#cq-input")).toBeVisible();
+  await expect(page.locator('[data-action="give-up"]')).toBeEnabled();
+  await page.reload();
+  await expect(page.locator("#cq-used")).toHaveText("8");
+  await expect(page.locator("#cq-input")).toBeVisible();
+  for (const key of ["blastoise", "caterpie", "mew"]) await guess(page, key);
+  await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
+  await expect(page.locator("#cq-count")).toHaveText("11");
+  await expect(page.locator("#cq-grade")).toHaveText("전진급");
+  await expect(page.locator(".cq-result-rank")).toContainText("11번 만에 정답");
+  await page.reload();
+  await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
+  await expect(page.locator("#cq-grade")).toHaveText("전진급");
+  await page.locator('[data-action="stats"]').click();
+  await expect(page.locator(".cq-record-result")).toContainText("11회 정답");
+  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText("전진급");
+});
+
+test("legacy automatic losses resume without stale loss records or changes to explicit give-ups", async ({
+  page,
+}) => {
+  const settings = { mode: "daily", day: dateFor(p("mew").id) };
+  const round = newRound(game, settings);
+  round.guesses = game.answers
+    .filter((p) => p.id !== round.target)
+    .slice(0, 8)
+    .map((p) => p.id);
+  const loss = {
+    version: game.version,
+    day: settings.day,
+    won: false,
+    attempts: 8,
+  };
+  const other = { ...loss, day: "2020-01-01", won: true, attempts: 2 };
+  await page.goto(pathFor("mew"));
+  await page.evaluate(
+    ({ key, round, loss, other }) => {
+      localStorage.setItem(key, JSON.stringify(round));
+      localStorage.setItem("pokeclue:records", JSON.stringify([loss, other]));
+    },
+    { key: storageKey(game, settings), round, loss, other },
+  );
+  await page.reload();
+  await expect(page.locator("#cq-used")).toHaveText("8");
+  await expect(page.locator("#cq-answer")).toBeHidden();
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("pokeclue:records")),
+    ),
+  ).toEqual([other]);
+  await guess(page, "mew");
+  await expect(page.locator("#cq-grade")).toHaveText("난천급");
+  await page.locator('[data-action="stats"]').click();
+  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText([
+    "난천급",
+    "레드급",
+  ]);
+  await page.evaluate(
+    ({ key, round, loss, other }) => {
+      localStorage.setItem(key, JSON.stringify({ ...round, gaveUp: true }));
+      localStorage.setItem("pokeclue:records", JSON.stringify([loss, other]));
+    },
+    { key: storageKey(game, settings), round, loss, other },
+  );
+  await page.reload();
   await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText(
     "정답 공개",
   );
-  await expect(page.locator('[data-action="give-up"]')).toBeDisabled();
+  await expect(page.locator("#cq-grade")).toHaveText("-");
+  await expect(page.locator(".cq-result-rank")).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("pokeclue:records")),
+    ),
+  ).toEqual([loss, other]);
+});
+
+test("long practice rounds persist, receive Joey rank, and render all six named tiers in both languages on mobile and desktop", async ({
+  page,
+}) => {
+  const settings = { mode: "practice", seed: "rank-check" };
+  const round = newRound(game, settings);
+  round.guesses = game.answers
+    .filter((p) => p.id !== round.target)
+    .slice(0, 40)
+    .map((p) => p.id);
+  await page.goto("./pokeclue.html?mode=practice&seed=rank-check");
+  await page.evaluate(
+    ({ key, round }) => localStorage.setItem(key, JSON.stringify(round)),
+    { key: storageKey(game, settings), round },
+  );
   await page.reload();
-  await expect(page.locator("#cq-answer-title")).toHaveText("뮤");
-  await page.goto(pathFor("charizard-mega-x"));
-  for (const key of [
-    "bulbasaur",
-    "ivysaur",
-    "venusaur",
-    "charmander",
-    "charmeleon",
-    "charizard",
-    "squirtle",
-    "charizard-mega-x",
-  ])
-    await guess(page, key);
-  await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
-  await expect(page.locator("#cq-count")).toHaveText("8");
+  await expect(page.locator("#cq-used")).toHaveText("40");
+  await expect(page.locator("#cq-input")).toBeVisible();
+  await guess(page, game.byId.get(round.target).key);
+  await expect(page.locator("#cq-used")).toHaveText("41");
+  await expect(page.locator("#cq-grade")).toHaveText("오성급");
   await page.reload();
-  await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
+  await expect(page.locator("#cq-grade")).toHaveText("오성급");
+  expect(
+    await page.evaluate(() => localStorage.getItem("pokeclue:records")),
+  ).toBeNull();
+  for (const language of ["ko", "en"]) {
+    await page.locator("[data-language-select]").selectOption(language);
+    for (const width of [320, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      expect(
+        await page
+          .locator(".cq-progress, .cq-result-rank")
+          .evaluateAll((els) =>
+            els.every((el) => el.scrollWidth <= el.clientWidth),
+          ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `.preview/pokeclue-rank-${language}-${width}.png`,
+      });
+      await page.locator('[data-action="help"]').click();
+      await expect(page.locator(".cq-rank-guide dt")).toHaveText(
+        language === "ko"
+          ? ["레드급", "난천급", "전진급", "버틀러급", "모미급", "오성급"]
+          : [
+              "Red tier",
+              "Cynthia tier",
+              "Volkner tier",
+              "Felix tier",
+              "Cheryl tier",
+              "Joey tier",
+            ],
+      );
+      await expect(page.locator(".cq-rank-guide dd")).toHaveText(
+        language === "ko"
+          ? ["1~5회", "6~10회", "11~20회", "21~30회", "31~40회", "41회 이상"]
+          : [
+              "1-5 guesses",
+              "6-10 guesses",
+              "11-20 guesses",
+              "21-30 guesses",
+              "31-40 guesses",
+              "41+ guesses",
+            ],
+      );
+      expect(
+        await page
+          .locator("#cq-dialog")
+          .evaluate((el) => el.scrollWidth <= el.clientWidth),
+      ).toBe(true);
+      expect(
+        await page.locator(".cq-rank-guide dd").evaluateAll((els) =>
+          els.every((el) => {
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            context.font = getComputedStyle(el).font;
+            return el.textContent
+              .split(/\s+/)
+              .every(
+                (word) =>
+                  context.measureText(word).width <=
+                  el.getBoundingClientRect().width,
+              );
+          }),
+        ),
+      ).toBe(true);
+      await page.locator(".cq-rank-guide").scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: `.preview/pokeclue-ranks-help-${language}-${width}.png`,
+      });
+      await page.locator('[data-action="close-dialog"]').click();
+    }
+  }
+});
+
+test("all six Gen IV characters replace old titles in saved results, records and bilingual shares", async ({
+  page,
+}) => {
+  const settings = { mode: "daily", day: dateFor(p("mew").id) };
+  const round = newRound(game, settings);
+  const wrong = game.answers
+    .filter((p) => p.id !== round.target)
+    .slice(0, 40)
+    .map((p) => p.id);
+  await page.goto(pathFor("mew"));
+  for (const [attempts, ko, en] of [
+    [5, "레드급", "Red tier"],
+    [10, "난천급", "Cynthia tier"],
+    [20, "전진급", "Volkner tier"],
+    [30, "버틀러급", "Felix tier"],
+    [40, "모미급", "Cheryl tier"],
+    [41, "오성급", "Joey tier"],
+  ]) {
+    await page.evaluate(
+      ({ key, round, attempts, wrong, day }) => {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            ...round,
+            guesses: [...wrong.slice(0, attempts - 1), round.target],
+          }),
+        );
+        localStorage.setItem(
+          "pokeclue:records",
+          JSON.stringify([
+            { version: round.version, day, won: true, attempts },
+          ]),
+        );
+      },
+      {
+        key: storageKey(game, settings),
+        round,
+        attempts,
+        wrong,
+        day: settings.day,
+      },
+    );
+    await page.reload();
+    await page.locator("#cq-answer-title").waitFor();
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: undefined,
+      });
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text) => {
+            window.clueShare = text;
+          },
+        },
+      });
+    });
+    for (const [language, title] of [
+      ["ko", ko],
+      ["en", en],
+    ]) {
+      await page.locator("[data-language-select]").selectOption(language);
+      await expect(page.locator("#cq-grade")).toHaveText(title);
+      await expect(page.locator(".cq-result-rank .cq-rank")).toHaveText(title);
+      await page.locator('[data-action="share"]').click();
+      expect(await page.evaluate(() => window.clueShare)).toContain(
+        `${title} · `,
+      );
+      for (const width of [320, 390, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        expect(
+          await page
+            .locator(".cq-progress > div, #cq-grade, .cq-result-rank .cq-rank")
+            .evaluateAll((els) =>
+              els.every((el) => el.scrollWidth <= el.clientWidth + 1),
+            ),
+        ).toBe(true);
+        await page.screenshot({
+          path: `.preview/pokeclue-trainer-${attempts}-${language}-${width}.png`,
+        });
+        await page.locator('[data-action="stats"]').click();
+        await expect(page.locator(".cq-record-result .cq-rank")).toHaveText(
+          title,
+        );
+        expect(
+          await page.locator(".history-list > div > span").evaluate((el) => {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            return range.getClientRects().length;
+          }),
+        ).toBe(1);
+        expect(
+          await page
+            .locator(".history-list > div, .cq-record-result .cq-rank")
+            .evaluateAll((els) =>
+              els.every((el) => el.scrollWidth <= el.clientWidth + 1),
+            ),
+        ).toBe(true);
+        await page.screenshot({
+          path: `.preview/pokeclue-trainer-stats-${attempts}-${language}-${width}.png`,
+        });
+        await page.locator('[data-action="close-dialog"]').click();
+      }
+    }
+  }
 });
 
 test("practice, daily, new practice confirmation and browser history preserve isolated rounds", async ({

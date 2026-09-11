@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import english from "../web/src/locales/en.js";
 import {
   createClueGame,
   compareSet,
@@ -17,7 +18,8 @@ import {
   isWon,
   isEnded,
   shareGrid,
-  MAX_GUESSES,
+  rankFor,
+  GUESS_RANKS,
   FIELDS,
   searchForms,
 } from "../web/src/clue-engine.js";
@@ -159,19 +161,85 @@ test("daily schedule covers the complete answer pool and practice is determinist
   assert.throws(() => game.targetFor({ mode: "practice", seed: "<bad>" }));
 });
 
-test("eight attempts stop a round, while a correct eighth guess still wins", () => {
+test("ranks follow attempts used with inclusive boundaries and reject invalid counts", () => {
+  assert.deepEqual(
+    GUESS_RANKS.map((tier) => tier.label),
+    ["레드급", "난천급", "전진급", "버틀러급", "모미급", "오성급"],
+  );
+  assert.deepEqual(
+    GUESS_RANKS.map((tier) => english[tier.label]),
+    [
+      "Red tier",
+      "Cynthia tier",
+      "Volkner tier",
+      "Felix tier",
+      "Cheryl tier",
+      "Joey tier",
+    ],
+  );
+  for (const [count, rank] of [
+    [1, "S"],
+    [5, "S"],
+    [6, "A"],
+    [10, "A"],
+    [11, "B"],
+    [20, "B"],
+    [21, "C"],
+    [30, "C"],
+    [31, "D"],
+    [40, "D"],
+    [41, "E"],
+    [1559, "E"],
+  ])
+    assert.equal(rankFor(count), rank);
+  for (const count of [0, -1, 1.5, NaN, Infinity, null, "5"])
+    assert.equal(rankFor(count), null);
+});
+
+test("wrong guesses never end a round, including beyond eight and thirty attempts", () => {
   const settings = settingsFor(p("charizard-mega-x").id),
     round = newRound(game, settings);
-  const wrong = game.answers.filter((p) => p.id !== round.target).slice(0, 8);
-  for (const p of wrong) assert.equal(submitGuess(round, game, p.id), "ok");
-  assert.equal(isEnded(round, game), true);
+  const wrong = game.answers.filter((p) => p.id !== round.target).slice(0, 60);
+  for (const p of wrong) {
+    assert.equal(submitGuess(round, game, p.id), "ok");
+    assert.equal(isEnded(round, game), false);
+  }
   assert.equal(isWon(round, game), false);
+  assert.equal(submitGuess(round, game, wrong[0].id), "duplicate");
+  assert.equal(round.guesses.length, 60);
+  const restored = restoreRound(JSON.stringify(round), game, settings);
+  assert.deepEqual(restored, round);
+  assert.equal(submitGuess(restored, game, restored.target), "ok");
+  assert.equal(isWon(restored, game), true);
+  assert.equal(isEnded(restored, game), true);
+  assert.equal(rankFor(restored.guesses.length), "E");
+  assert.equal(submitGuess(restored, game, wrong[0].id), "finished");
+});
+
+test("legacy eighth-attempt losses resume while eighth-attempt wins and explicit give-ups remain final", () => {
+  const settings = settingsFor(p("charizard-mega-x").id);
+  const wrong = game.answers
+    .filter((p) => p.id !== game.targetFor(settings))
+    .slice(0, 8);
+  const saved = {
+    ...newRound(game, settings),
+    guesses: wrong.map((p) => p.id),
+  };
+  const round = restoreRound(JSON.stringify(saved), game, settings);
+  assert.deepEqual(round, saved);
+  assert.equal(isEnded(round, game), false);
+  assert.equal(submitGuess(round, game, round.target), "ok");
+  assert.equal(rankFor(round.guesses.length), "A");
   assert.equal(submitGuess(round, game, round.target), "finished");
-  const win = newRound(game, settings);
-  for (const p of wrong.slice(0, 7)) submitGuess(win, game, p.id);
-  submitGuess(win, game, win.target);
-  assert.equal(isWon(win, game), true);
-  assert.equal(win.guesses.length, MAX_GUESSES);
+  for (const finished of [
+    { ...saved, gaveUp: true },
+    { ...saved, guesses: [...saved.guesses.slice(0, 7), saved.target] },
+  ]) {
+    const restored = restoreRound(JSON.stringify(finished), game, settings);
+    assert.deepEqual(restored, finished);
+    assert.equal(isEnded(restored, game), true);
+    assert.equal(submitGuess(restored, game, restored.target), "finished");
+  }
 });
 
 test("cosmetic equivalents win and cannot waste duplicate guesses; Mega and regional forms stay distinct", () => {
@@ -186,7 +254,7 @@ test("cosmetic equivalents win and cannot waste duplicate guesses; Mega and regi
   assert.equal(submitGuess(mega, game, 10057), "unknown");
 });
 
-test("storage validates identity, duplicate groups, early wins, limits and corrupted data", () => {
+test("storage validates identity, duplicate groups, early wins, catalog bounds and corrupted data", () => {
   const settings = settingsFor(p("charizard-mega-x").id),
     fresh = newRound(game, settings);
   const round = newRound(game, settings);
@@ -202,7 +270,10 @@ test("storage validates identity, duplicate groups, early wins, limits and corru
     JSON.stringify({ ...round, guesses: [p("unown-a").id, p("unown-b").id] }),
     JSON.stringify({ ...round, guesses: [round.target, 1] }),
     JSON.stringify({ ...round, guesses: [round.target], gaveUp: true }),
-    JSON.stringify({ ...round, guesses: Array(9).fill(1) }),
+    JSON.stringify({
+      ...round,
+      guesses: Array(game.pokemon.length + 1).fill(1),
+    }),
   ])
     assert.deepEqual(restoreRound(raw, game, settings), fresh);
   const won = { ...round, guesses: [...round.guesses, round.target] };

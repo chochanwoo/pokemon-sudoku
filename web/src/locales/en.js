@@ -246,14 +246,26 @@ export default {
   미확인: "Unknown",
   연습: "Practice",
   "연습 도전": "Practice round",
-  "남은 기회": "Guesses left",
+  "추측 횟수": "Guesses",
+  "완료 등급": "Result rank",
+  레드급: "Red tier",
+  난천급: "Cynthia tier",
+  전진급: "Volkner tier",
+  // English DPPt names Route 229's Butler "Felix".
+  버틀러급: "Felix tier",
+  모미급: "Cheryl tier",
+  오성급: "Joey tier",
+  "{rank} · {count}번 만에 정답": "{rank} · Solved in {count} guesses",
+  "도전 종료 · {count}회 추측": "Round ended · {count} guesses",
+  "등급 기준": "Rank criteria",
+  "{min}~{max}회": "{min}-{max} guesses",
+  "{min}회 이상": "{min}+ guesses",
   "일치한 단서": "Matching clues",
   "새 연습": "New practice",
   "이미 같은 단서의 모습을 추측했어요.":
     "You already guessed a form with the same clues.",
-  "기회를 모두 사용했어요.": "No guesses left.",
-  "{count}개 단서 일치 · {remaining}번 남았어요":
-    "{count} clues match · {remaining} guesses left",
+  "{count}개 단서 일치 · {attempts}번째 추측":
+    "{count} clues match · Guess {attempts}",
   "숨겨진 특성": "Hidden ability",
   "{stage}단계": "Stage {stage}",
   "{generation}세대": "Gen {generation}",
@@ -266,12 +278,12 @@ export default {
     "A new Pokemon will be selected for practice.",
   "일치 O · 일부 ~ · 불일치 X": "Match O · Partial ~ · No match X",
   "포케클루 규칙": "PokeClue rules",
-  "포켓몬을 최대 8번 추측합니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.":
-    "Guess the Pokemon in up to 8 attempts. Types, abilities and egg groups match when their full sets agree, regardless of order. Shared entries count as partial matches.",
+  "횟수 제한 없이 추측하고, 정답을 맞히기까지 사용한 횟수로 등급을 받습니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.":
+    "Guess without a limit. Your rank depends on the number of guesses used to solve the puzzle. Types, abilities and egg groups match when their full sets agree, regardless of order. Shared entries count as partial matches.",
   "화살표는 정답을 가리킵니다. 위 화살표는 정답의 값이 더 높고, 아래 화살표는 더 낮다는 뜻입니다.":
     "Arrows point toward the answer: up means its value is higher; down means it is lower.",
-  "진화는 단계와 계열을 함께 비교합니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.":
-    "Evolution compares both stage and family. Stages start at 1, including baby Pokemon; Mega Evolution does not add a stage. Generation refers to the species' debut.",
+  "진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.":
+    "Evolution compares both stage and family. A family is a connected evolutionary line, such as Bulbasaur, Ivysaur and Venusaur. Stages start at 1, including baby Pokemon; Mega Evolution does not add a stage. Generation refers to the species' debut.",
   "특성은 숨겨진 특성을 포함합니다. 미확인 자료는 판정하지 않습니다. 특성 자료가 없거나 다른 종과 모든 단서가 같아 구별할 수 없는 포켓몬은 정답으로 출제하지 않습니다.":
     "Abilities include hidden abilities. Missing data is not scored. Pokemon with missing ability data, or identical clues to a different species, are not selected as answers.",
   "메가·리전 폼도 포함합니다. 같은 종에서 모든 단서가 같은 외형 차이는 같은 정답으로 인정하며, 일부 이벤트·기념용 모습은 제외합니다.":

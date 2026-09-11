@@ -35,7 +35,8 @@ import {
   shareGrid,
   dayKey,
   searchForms,
-  MAX_GUESSES,
+  GUESS_RANKS,
+  rankFor,
   FIELDS,
 } from "./clue-engine.js";
 import { siteBrand, languagePicker } from "./site-brand.js";
@@ -116,6 +117,8 @@ let matches = [],
 const refreshIcons = () =>
   createIcons({ icons, attrs: { "stroke-width": 1.8 } });
 const finished = () => isEnded(round, game);
+const rankName = (rank) =>
+  t(GUESS_RANKS.find((tier) => tier.rank === rank).label);
 const localName = (item) =>
   getLanguage() === "ko" ? item.name || item.english : item.english;
 const sprite = (p) =>
@@ -166,7 +169,7 @@ function mount() {
     <main class="main cq-main">
       <div id="cq-new-day" class="cq-day-banner" hidden><span>${t("새로운 오늘의 포켓몬이 도착했어요.")}</span><button class="text-button" data-action="daily">${icon("rotate-cw")}${t("오늘의 문제")}</button></div>
       <section class="cq-heading"><div><div class="eyebrow" id="cq-date"></div><h1>${t("포케클루")}</h1></div><div class="segmented cq-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
-      <section class="cq-progress" aria-label="${t("현재 기록")}"><div><span>${t("남은 기회")}</span><strong id="cq-remaining"></strong></div><ol id="cq-attempts" class="cq-attempts" aria-hidden="true"></ol><div class="cq-best"><span>${t("일치한 단서")}</span><strong id="cq-best"></strong></div></section>
+      <section class="cq-progress" aria-label="${t("현재 기록")}"><div><span>${t("추측 횟수")}</span><strong id="cq-used"></strong></div><div class="cq-best"><span>${t("일치한 단서")}</span><strong id="cq-best"></strong></div><div><span>${t("완료 등급")}</span><strong id="cq-grade"></strong></div></section>
       <p id="cq-save-warning" class="cq-warning" role="status" hidden>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
       <section id="cq-answer" class="cq-answer" hidden aria-live="polite"></section>
       <section id="cq-search-panel" aria-label="${t("포켓몬 추측")}">
@@ -249,6 +252,14 @@ function start(next, navigate = false) {
     history.pushState(null, "", url.href);
   }
   round = restoreRound(read(storageKey(game, settings)), game, settings);
+  // The old automatic loss at eight guesses can now continue; explicit give-ups stay final.
+  if (settings.mode === "daily" && round.guesses.length === 8 && !finished()) {
+    const previous = records();
+    const resumed = previous.filter(
+      (r) => r.day !== settings.day || r.won || r.attempts !== 8,
+    );
+    if (resumed.length !== previous.length) save("pokeclue:records", resumed);
+  }
   clearTimeout(toastTimer);
   document.querySelector("#cq-toast").textContent = "";
   document.querySelector("#cq-input").value = "";
@@ -324,14 +335,14 @@ function guess(id) {
   );
   toast(
     isWon(round, game)
-      ? t("정답이에요!")
-      : finished()
-        ? t("기회를 모두 사용했어요.")
-        : t("{count}개 단서 일치 · {remaining}번 남았어요", {
-            count: FIELDS.filter((key) => feedback[key].state === "match")
-              .length,
-            remaining: MAX_GUESSES - round.guesses.length,
-          }),
+      ? t("{rank} · {count}번 만에 정답", {
+          rank: rankName(rankFor(round.guesses.length)),
+          count: round.guesses.length,
+        })
+      : t("{count}개 단서 일치 · {attempts}번째 추측", {
+          count: FIELDS.filter((key) => feedback[key].state === "match").length,
+          attempts: round.guesses.length,
+        }),
   );
   if (finished())
     document.querySelector("#cq-answer-title").focus({ preventScroll: true });
@@ -390,7 +401,7 @@ function renderHistory() {
 function render() {
   const target = game.byId.get(round.target),
     won = isWon(round, game);
-  const remaining = MAX_GUESSES - round.guesses.length;
+  const rank = won ? rankFor(round.guesses.length) : null;
   document.querySelector("#cq-date").innerHTML =
     `${icon(settings.mode === "daily" ? "calendar-days" : "fingerprint")} ${settings.mode === "daily" ? esc(settings.day.replaceAll("-", ".")) : t("연습 도전")}`;
   document.querySelectorAll(".cq-mode button").forEach((button) => {
@@ -398,12 +409,8 @@ function render() {
     button.classList.toggle("active", selected);
     button.setAttribute("aria-pressed", selected);
   });
-  document.querySelector("#cq-remaining").textContent = remaining;
-  document.querySelector("#cq-attempts").innerHTML = Array.from(
-    { length: MAX_GUESSES },
-    (_, i) =>
-      `<li class="${i < round.guesses.length ? (won && i === round.guesses.length - 1 ? "cq-attempt-won" : "cq-attempt-used") : ""}"></li>`,
-  ).join("");
+  document.querySelector("#cq-used").textContent = round.guesses.length;
+  document.querySelector("#cq-grade").textContent = rank ? rankName(rank) : "-";
   const best = Math.max(
     0,
     ...round.guesses.map((id) => {
@@ -417,6 +424,7 @@ function render() {
   if (finished())
     document.querySelector("#cq-answer").innerHTML = `
     <div class="cq-answer-heading">${sprite(target)}<div><span class="cq-answer-state">${icon(won ? "trophy" : "flag")}${t(won ? "정답!" : "정답 공개")}</span><h2 id="cq-answer-title" tabindex="-1">${esc(pokemonName(target))}</h2></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button></div>
+    ${rank ? `<div class="cq-result-rank"><strong class="cq-rank cq-rank-${rank}">${rankName(rank)}</strong><span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}
     <dl class="cq-answer-facts">${FIELDS.map((field) => `<div><dt>${t(labels[field])}</dt><dd>${values(target, field)}</dd></div>`).join("")}</dl>`;
   document.querySelector("#cq-starters").hidden = round.guesses.length > 0;
   document.querySelector("#cq-starters").innerHTML = [1, 4, 7, 25, 133]
@@ -454,8 +462,8 @@ function records() {
             /^\d{4}-\d{2}-\d{2}$/.test(r.day) &&
             typeof r.won === "boolean" &&
             Number.isInteger(r.attempts) &&
-            r.attempts >= 0 &&
-            r.attempts <= MAX_GUESSES,
+            r.attempts >= (r.won ? 1 : 0) &&
+            r.attempts <= game.pokemon.length,
         )
       : [];
   } catch {
@@ -495,7 +503,13 @@ async function share() {
     url.searchParams.set("mode", "practice");
     url.searchParams.set("seed", settings.seed);
   }
-  const text = `${t("포케클루")} ${settings.mode === "daily" ? settings.day : t("연습")} ${isWon(round, game) ? round.guesses.length : "X"}/${MAX_GUESSES}\n${shareGrid(round, game)}\n${t("일치 O · 일부 ~ · 불일치 X")}\n${url.href}`;
+  const result = isWon(round, game)
+    ? t("{rank} · {count}번 만에 정답", {
+        rank: rankName(rankFor(round.guesses.length)),
+        count: round.guesses.length,
+      })
+    : t("도전 종료 · {count}회 추측", { count: round.guesses.length });
+  const text = `${t("포케클루")} ${settings.mode === "daily" ? settings.day : t("연습")}\n${result}\n${shareGrid(round, game)}\n${t("일치 O · 일부 ~ · 불일치 X")}\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
       await navigator.share({ title: t("포케클루"), text });
@@ -583,12 +597,21 @@ function onClick(event) {
       dialog(
         "포케클루 규칙",
         `<ul class="rules">
-      <li>${t("포켓몬을 최대 8번 추측합니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.")}</li>
+      <li>${t("횟수 제한 없이 추측하고, 정답을 맞히기까지 사용한 횟수로 등급을 받습니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.")}</li>
       <li>${t("화살표는 정답을 가리킵니다. 위 화살표는 정답의 값이 더 높고, 아래 화살표는 더 낮다는 뜻입니다.")}</li>
-      <li>${t("진화는 단계와 계열을 함께 비교합니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.")}</li>
+      <li>${t("진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.")}</li>
       <li>${t("특성은 숨겨진 특성을 포함합니다. 미확인 자료는 판정하지 않습니다. 특성 자료가 없거나 다른 종과 모든 단서가 같아 구별할 수 없는 포켓몬은 정답으로 출제하지 않습니다.")}</li>
       <li>${t("메가·리전 폼도 포함합니다. 같은 종에서 모든 단서가 같은 외형 차이는 같은 정답으로 인정하며, 일부 이벤트·기념용 모습은 제외합니다.")}</li>
-      <li>${t("데일리는 한국 시간 자정에 바뀝니다. 연습은 데일리 기록과 별개이며, 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>`,
+      <li>${t("데일리는 한국 시간 자정에 바뀝니다. 연습은 데일리 기록과 별개이며, 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>
+      <section class="cq-rank-rules"><h3>${t("등급 기준")}</h3><dl class="cq-rank-guide">${GUESS_RANKS.map(
+        (tier, index) => {
+          const min = index ? GUESS_RANKS[index - 1].max + 1 : 1;
+          const range = Number.isFinite(tier.max)
+            ? t("{min}~{max}회", { min, max: tier.max })
+            : t("{min}회 이상", { min });
+          return `<div><dt><span class="cq-rank cq-rank-${tier.rank}">${t(tier.label)}</span></dt><dd>${range}</dd></div>`;
+        },
+      ).join("")}</dl></section>`,
       );
       break;
     case "stats": {
@@ -601,7 +624,7 @@ function onClick(event) {
             .slice(0, 8)
             .map(
               (r) =>
-                `<div><span>${esc(r.day)}</span><strong>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</strong></div>`,
+                `<div><span>${esc(r.day)}</span><strong class="cq-record-result">${r.won ? `<span class="cq-rank cq-rank-${rankFor(r.attempts)}">${rankName(rankFor(r.attempts))}</span>` : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
             )
             .join("") ||
           `<p class="dialog-copy">${t("아직 완료한 도전이 없어요.")}</p>`

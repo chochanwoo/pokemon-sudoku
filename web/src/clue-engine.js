@@ -3,7 +3,18 @@ import { isPlayableForm } from "./form-policy.js";
 import { validDay, resolveDay, searchForms } from "./similarity-engine.js";
 
 export { dayKey, searchForms };
-export const MAX_GUESSES = 8;
+export const GUESS_RANKS = [
+  { rank: "S", max: 5, label: "레드급" },
+  { rank: "A", max: 10, label: "난천급" },
+  { rank: "B", max: 20, label: "전진급" },
+  { rank: "C", max: 30, label: "버틀러급" },
+  { rank: "D", max: 40, label: "모미급" },
+  { rank: "E", max: Infinity, label: "오성급" },
+];
+export function rankFor(attempts) {
+  if (!Number.isInteger(attempts) || attempts < 1) return null;
+  return GUESS_RANKS.find((tier) => attempts <= tier.max).rank;
+}
 export const FIELDS = [
   "types",
   "abilities",
@@ -172,8 +183,7 @@ export function isWon(round, game) {
     (id) => answerKey(game.byId.get(id)) === answerKey(target),
   );
 }
-export const isEnded = (round, game) =>
-  round.gaveUp || round.guesses.length >= MAX_GUESSES || isWon(round, game);
+export const isEnded = (round, game) => round.gaveUp || isWon(round, game);
 export function submitGuess(round, game, id) {
   if (isEnded(round, game)) return "finished";
   const p = game.byId.get(id);
@@ -198,7 +208,7 @@ export function restoreRound(raw, game, settings) {
       saved.target !== clean.target ||
       typeof saved.gaveUp !== "boolean" ||
       !Array.isArray(saved.guesses) ||
-      saved.guesses.length > MAX_GUESSES
+      saved.guesses.length > game.pokemon.length
     )
       return clean;
     const restored = newRound(game, settings);

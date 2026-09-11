@@ -22,15 +22,24 @@
   color: var(--cq-accent);
 }
 .cq-progress {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
-  gap: 28px;
   padding: 20px 0;
   border-block: 1px solid var(--line);
   margin-bottom: 26px;
 }
 .cq-progress > div {
-  flex-shrink: 0;
+  min-width: 0;
+  padding: 0 24px;
+  border-right: 1px solid var(--line);
+}
+.cq-progress > div:first-child {
+  padding-left: 0;
+}
+.cq-progress > div:last-child {
+  padding-right: 0;
+  border-right: 0;
 }
 .cq-progress > div > span {
   display: block;
@@ -39,37 +48,106 @@
   margin-bottom: 8px;
 }
 .cq-progress strong {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
   font-size: 26px;
   font-variant-numeric: tabular-nums;
 }
-.cq-best {
-  margin-left: auto;
-  padding-left: 28px;
-  border-left: 1px solid var(--line);
+#cq-grade {
+  font-size: 18px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .cq-best strong {
   color: var(--cq-accent);
 }
-.cq-attempts {
+.cq-rank {
+  display: inline-grid;
+  place-items: center;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+  font-weight: 750;
+  color: #56616e;
+  background: #edf0f4;
+}
+.cq-rank-S {
+  color: #805313;
+  background: #fbf0d9;
+}
+.cq-rank-A {
+  color: #205d4c;
+  background: #e3f2e9;
+}
+.cq-rank-B {
+  color: #315f92;
+  background: #e7effa;
+}
+.cq-result-rank {
   display: flex;
-  gap: 6px;
-  flex: 1;
-  max-width: 290px;
-  padding: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 24px;
+  font-size: 14px;
+}
+.cq-result-rank .cq-rank {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 18px;
+}
+.cq-record-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-left: 12px;
+}
+.cq-record-result .cq-rank {
+  font-size: 11px;
+}
+#cq-dialog .history-list > div > span {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.cq-rank-rules {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.cq-rank-rules h3 {
+  font-size: 14px;
+}
+.cq-rank-guide {
   margin: 16px 0 0;
-  list-style: none;
 }
-.cq-attempts li {
-  flex: 1;
-  height: 6px;
-  background: #e3e7ee;
-  border-radius: 2px;
+.cq-rank-guide > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
 }
-.cq-attempts li.cq-attempt-used {
-  background: #de777c;
+.cq-rank-guide dt {
+  min-width: 0;
 }
-.cq-attempts li.cq-attempt-won {
-  background: var(--cq-accent);
+.cq-rank-guide dd {
+  margin: 0;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .cq-warning {
   padding: 12px 0;
@@ -629,18 +707,22 @@
     padding: 8px 10px;
   }
   .cq-progress {
-    gap: 16px;
     padding: 18px 0;
     margin-bottom: 22px;
+  }
+  .cq-progress > div {
+    padding: 0 12px;
+  }
+  .cq-progress > div > span {
+    min-height: 30px;
+    line-height: 15px;
   }
   .cq-progress strong {
     font-size: 23px;
   }
-  .cq-best {
-    padding-left: 16px;
-  }
-  .cq-attempts {
-    gap: 4px;
+  #cq-grade {
+    font-size: 12px;
+    line-height: 18px;
   }
   .cq-starters button {
     flex-direction: column;
@@ -691,12 +773,6 @@
   }
   .cq-answer-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .cq-progress {
-    gap: 10px;
-  }
-  .cq-best {
-    padding-left: 10px;
   }
   .cq-progress > div > span {
     font-size: 11px;
