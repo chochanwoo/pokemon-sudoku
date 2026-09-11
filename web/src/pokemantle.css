@@ -441,6 +441,7 @@
 }
 .pm-game-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -559,6 +560,9 @@
     flex-direction: column;
     gap: 4px;
     font-size: 11px;
+  }
+  .pm-summary span {
+    min-height: 33px;
   }
   .pm-history {
     margin-top: 8px;

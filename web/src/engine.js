@@ -1,3 +1,5 @@
+import { englishName } from "./pokemon-names.js";
+
 export const GAME_VERSION = 2;
 export const DIFFICULTIES = ["easy", "normal", "hard"];
 
@@ -428,9 +430,14 @@ export function searchPokemon(pokemon, query) {
   return pokemon.filter(
     (p) =>
       !q ||
-      [p.name, p.english, p.key, String(p.id), initials(p.name)].some((value) =>
-        value.toLowerCase().replace(/\s/g, "").includes(q),
-      ),
+      [
+        p.name,
+        p.english,
+        englishName(p),
+        p.key,
+        String(p.id),
+        initials(p.name),
+      ].some((value) => value.toLowerCase().replace(/\s/g, "").includes(q)),
   );
 }
 

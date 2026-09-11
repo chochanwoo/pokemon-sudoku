@@ -133,6 +133,7 @@ p {
 }
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
 }
 .main {
@@ -569,6 +570,18 @@ h1 {
   color: #3569bb;
   background: #e5eefc;
 }
+.language-picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.language-picker:focus-within {
+  outline: 3px solid #80b2f2;
+  outline-offset: 3px;
+}
 .tool-divider {
   height: 20px;
   width: 1px;
@@ -839,6 +852,7 @@ h1 {
   font-size: 16px;
   display: block;
   margin: 3px 0 6px;
+  overflow-wrap: anywhere;
 }
 .selected-preview > div > div {
   display: flex;
@@ -1851,6 +1865,20 @@ dialog::backdrop {
   }
 }
 @media (max-width: 460px) {
+  .brand {
+    font-size: 18px;
+    gap: 8px;
+  }
+  .header-actions .icon-button {
+    width: 32px;
+    height: 39px;
+  }
+  .header-actions {
+    gap: 0;
+  }
+  .brand-mark {
+    flex-shrink: 0;
+  }
   .board-wrap {
     margin-inline: -16px;
   }
@@ -1948,6 +1976,14 @@ dialog::backdrop {
   }
   .toolbar {
     gap: 0;
+  }
+  html[lang="en"] .toolbar .text-button span {
+    display: none;
+  }
+  html[lang="en"] .toolbar .text-button {
+    width: 33px;
+    height: 36px;
+    justify-content: center;
   }
 }
 @media (prefers-reduced-motion: reduce) {

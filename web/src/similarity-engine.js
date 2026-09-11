@@ -1,4 +1,5 @@
 import { dayKey, initials } from "./engine.js";
+import { englishName } from "./pokemon-names.js";
 
 export { dayKey };
 export const MAX_HINTS = 3;
@@ -151,6 +152,7 @@ export function searchForms(pokemon, query) {
       p.baseName,
       p.form,
       p.english,
+      englishName(p),
       p.key,
       initials(p.name),
       String(p.speciesId),
