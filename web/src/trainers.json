@@ -1,0 +1,113 @@
+{
+  "S": [
+    { "id": "red", "ko": "레드", "en": "Red", "sprite": "red", "game": "HGSS" }
+  ],
+  "A": [
+    {
+      "id": "cynthia",
+      "ko": "난천",
+      "en": "Cynthia",
+      "sprite": "cynthia-gen4",
+      "game": "DPPt"
+    },
+    {
+      "id": "lance",
+      "ko": "목호",
+      "en": "Lance",
+      "sprite": "lance",
+      "game": "HGSS"
+    },
+    {
+      "id": "blue",
+      "ko": "그린",
+      "en": "Blue",
+      "sprite": "blue",
+      "game": "HGSS"
+    }
+  ],
+  "B": [
+    {
+      "id": "volkner",
+      "ko": "전진",
+      "en": "Volkner",
+      "sprite": "volkner",
+      "game": "DPPt"
+    },
+    {
+      "id": "gardenia",
+      "ko": "유채",
+      "en": "Gardenia",
+      "sprite": "gardenia",
+      "game": "DPPt"
+    },
+    {
+      "id": "candice",
+      "ko": "무청",
+      "en": "Candice",
+      "sprite": "candice",
+      "game": "DPPt"
+    },
+    {
+      "id": "roark",
+      "ko": "강석",
+      "en": "Roark",
+      "sprite": "roark",
+      "game": "DPPt"
+    }
+  ],
+  "C": [
+    {
+      "id": "felix",
+      "ko": "버틀러",
+      "en": "Felix",
+      "sprite": "acetrainer-gen4dp",
+      "game": "DPPt"
+    },
+    {
+      "id": "dana",
+      "ko": "다이안",
+      "en": "Dana",
+      "sprite": "acetrainerf-gen4dp",
+      "game": "DPPt"
+    },
+    {
+      "id": "sandra",
+      "ko": "현세",
+      "en": "Sandra",
+      "sprite": "acetrainerf-gen4dp",
+      "game": "DPPt"
+    }
+  ],
+  "D": [
+    {
+      "id": "cheryl",
+      "ko": "모미",
+      "en": "Cheryl",
+      "sprite": "cheryl",
+      "game": "DPPt"
+    },
+    {
+      "id": "mira",
+      "ko": "미루",
+      "en": "Mira",
+      "sprite": "mira",
+      "game": "DPPt"
+    },
+    {
+      "id": "marley",
+      "ko": "미정",
+      "en": "Marley",
+      "sprite": "marley",
+      "game": "DPPt"
+    }
+  ],
+  "E": [
+    {
+      "id": "joey",
+      "ko": "오성",
+      "en": "Joey",
+      "sprite": "youngster-gen4",
+      "game": "HGSS"
+    }
+  ]
+}

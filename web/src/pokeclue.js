@@ -40,6 +40,7 @@ import {
   FIELDS,
 } from "./clue-engine.js";
 import { siteBrand, languagePicker } from "./site-brand.js";
+import { trainerResultKey } from "./trainers.js";
 import {
   rankName,
   trainerBadge,
@@ -299,6 +300,13 @@ function closeSuggestions() {
   input.removeAttribute("aria-activedescendant");
   active = -1;
 }
+const trainerKey = (
+  challenge = settings.mode === "daily"
+    ? `daily:${settings.day}`
+    : `practice:${settings.seed}`,
+  attempts = round.guesses.length,
+) => trainerResultKey("pokeclue", challenge, attempts);
+
 function renderSuggestions() {
   const input = document.querySelector("#cq-input"),
     query = input.value.trim();
@@ -357,7 +365,7 @@ function guess(id) {
   toast(
     isWon(round, game)
       ? t("{rank} · {count}번 만에 정답", {
-          rank: rankName(rankFor(round.guesses.length)),
+          rank: rankName(rankFor(round.guesses.length), trainerKey()),
           count: round.guesses.length,
         })
       : t("{count}개 단서 일치 · {attempts}번째 추측", {
@@ -432,7 +440,9 @@ function render() {
     button.setAttribute("aria-pressed", selected);
   });
   document.querySelector("#cq-used").textContent = round.guesses.length;
-  document.querySelector("#cq-grade").textContent = rank ? rankName(rank) : "-";
+  document.querySelector("#cq-grade").textContent = rank
+    ? rankName(rank, trainerKey())
+    : "-";
   const best = Math.max(
     0,
     ...round.guesses.map((id) => {
@@ -446,7 +456,7 @@ function render() {
   if (finished())
     document.querySelector("#cq-answer").innerHTML = `
     <div class="cq-answer-heading">${sprite(target)}<div><span class="cq-answer-state">${icon(won ? "trophy" : "flag")}${t(won ? "정답!" : "정답 공개")}</span><h2 id="cq-answer-title" tabindex="-1">${esc(pokemonName(target))}</h2></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button></div>
-    ${rank ? `<div class="cq-result-rank">${trainerReplay(rank, "cq-rank")}<span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}
+    ${rank ? `<div class="cq-result-rank">${trainerReplay(rank, "cq-rank", trainerKey())}<span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}
     ${round.legacyWin ? `<p class="cq-warning">${t("이전 세대 기준으로 완료한 기록입니다. 기존 정답 인정은 유지됩니다.")}</p>` : ""}
     <dl class="cq-answer-facts">${FIELDS.map((field) => `<div><dt>${t(labels[field])}</dt><dd>${values(target, field)}</dd></div>`).join("")}</dl>`;
   document.querySelector("#cq-starters").hidden = round.guesses.length > 0;
@@ -485,6 +495,7 @@ function showTrainerResult() {
     "도전 완료",
     trainerResult({
       attempts: round.guesses.length,
+      resultKey: trainerKey(),
       ranks: GUESS_RANKS,
       context: `${t("포케클루")} · ${settings.mode === "practice" ? t("연습") : settings.day}`,
       answerName: pokemonName(target),
@@ -548,7 +559,7 @@ async function share() {
   }
   const result = isWon(round, game)
     ? t("{rank} · {count}번 만에 정답", {
-        rank: rankName(rankFor(round.guesses.length)),
+        rank: rankName(rankFor(round.guesses.length), trainerKey()),
         count: round.guesses.length,
       })
     : t("도전 종료 · {count}회 추측", { count: round.guesses.length });
@@ -663,7 +674,7 @@ function onClick(event) {
             .slice(0, 8)
             .map(
               (r) =>
-                `<div><span>${esc(r.day)}</span><strong class="cq-record-result">${r.won ? trainerBadge(rankFor(r.attempts), "cq-rank") : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
+                `<div><span>${esc(r.day)}</span><strong class="cq-record-result">${r.won ? trainerBadge(rankFor(r.attempts), "cq-rank", trainerKey(`daily:${r.day}`, r.attempts)) : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
             )
             .join("") ||
           `<p class="dialog-copy">${t("아직 완료한 도전이 없어요.")}</p>`

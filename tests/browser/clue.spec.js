@@ -8,6 +8,7 @@ import {
   storageKey,
   newRound,
 } from "../../web/src/clue-engine.js";
+import { trainerFor, trainerResultKey } from "../../web/src/trainers.js";
 
 const read = (file) =>
   JSON.parse(
@@ -27,6 +28,8 @@ function dateFor(id) {
   throw new Error("No answer date");
 }
 const pathFor = (key) => `./pokeclue.html?date=${dateFor(p(key).id)}`;
+const earnedTrainer = (rank, day, attempts) =>
+  trainerFor(rank, trainerResultKey("pokeclue", `daily:${day}`, attempts));
 async function guess(page, key) {
   await page.locator("#cq-input").fill(key);
   await page.locator(`#cq-options [data-guess="${p(key).id}"]`).click();
@@ -42,8 +45,8 @@ test("the new hub card has real localized previews and both navigation direction
   page,
 }) => {
   await page.goto("./");
-  await expect(page.locator(".game-card")).toHaveCount(3);
-  await expect(page.locator(".hub-heading > span")).toHaveText("3개 게임");
+  await expect(page.locator(".game-card")).toHaveCount(4);
+  await expect(page.locator(".hub-heading > span")).toHaveText("4개 게임");
   const card = page.getByRole("link", { name: "포케클루 플레이", exact: true });
   await expect(card).toHaveAttribute("href", "./pokeclue.html");
   await expect(card.locator(".game-formats")).toHaveText("데일리 · 연습");
@@ -195,6 +198,7 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
 test("eight failed guesses stay playable and a later win receives its earned rank", async ({
   page,
 }) => {
+  const title = `${earnedTrainer("C", dateFor(p("mew").id), 11).ko}급`;
   await page.goto(pathFor("mew"));
   for (const key of [
     "bulbasaur",
@@ -219,14 +223,14 @@ test("eight failed guesses stay playable and a later win receives its earned ran
   for (const key of ["blastoise", "caterpie", "mew"]) await guess(page, key);
   await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
   await expect(page.locator("#cq-count")).toHaveText("11");
-  await expect(page.locator("#cq-grade")).toHaveText("버틀러급");
+  await expect(page.locator("#cq-grade")).toHaveText(title);
   await expect(page.locator(".cq-result-rank")).toContainText("11번 만에 정답");
   await page.reload();
   await expect(page.locator("#cq-answer .cq-answer-state")).toHaveText("정답!");
-  await expect(page.locator("#cq-grade")).toHaveText("버틀러급");
+  await expect(page.locator("#cq-grade")).toHaveText(title);
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator(".cq-record-result")).toContainText("11회 정답");
-  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText("버틀러급");
+  await expect(page.locator(".cq-record-result .cq-rank")).toHaveText(title);
 });
 
 test("legacy automatic losses resume without stale loss records or changes to explicit give-ups", async ({
@@ -262,10 +266,11 @@ test("legacy automatic losses resume without stale loss records or changes to ex
     ),
   ).toEqual([other]);
   await guess(page, "mew");
-  await expect(page.locator("#cq-grade")).toHaveText("버틀러급");
+  const title = `${earnedTrainer("C", settings.day, 9).ko}급`;
+  await expect(page.locator("#cq-grade")).toHaveText(title);
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator(".cq-record-result .cq-rank")).toHaveText([
-    "버틀러급",
+    title,
     "레드급",
   ]);
   await page.evaluate(
@@ -328,7 +333,7 @@ test("long practice rounds persist, receive Joey rank, and render all six named 
         path: `.preview/pokeclue-rank-${language}-${width}.png`,
       });
       await page.locator('[data-action="help"]').click();
-      await expect(page.locator(".cq-rank-guide dt")).toHaveText(
+      await expect(page.locator(".cq-rank-guide dt .trainer-badge")).toHaveText(
         language === "ko"
           ? ["레드급", "난천급", "전진급", "버틀러급", "모미급", "오성급"]
           : [
@@ -392,14 +397,17 @@ test("all six Gen IV characters replace old titles in saved results, records and
     .slice(0, 40)
     .map((p) => p.id);
   await page.goto(pathFor("mew"));
-  for (const [attempts, ko, en] of [
-    [3, "레드급", "Red tier"],
-    [5, "난천급", "Cynthia tier"],
-    [8, "전진급", "Volkner tier"],
-    [11, "버틀러급", "Felix tier"],
-    [15, "모미급", "Cheryl tier"],
-    [16, "오성급", "Joey tier"],
+  for (const [attempts, rank] of [
+    [3, "S"],
+    [5, "A"],
+    [8, "B"],
+    [11, "C"],
+    [15, "D"],
+    [16, "E"],
   ]) {
+    const trainer = earnedTrainer(rank, settings.day, attempts);
+    const ko = `${trainer.ko}급`,
+      en = `${trainer.en} tier`;
     await page.evaluate(
       ({ key, round, attempts, wrong, day }) => {
         localStorage.setItem(

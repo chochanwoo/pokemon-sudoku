@@ -52,6 +52,7 @@ test("translations preserve placeholders and cover literal UI message keys", () 
     "home.js",
     "pokemantle.js",
     "pokeclue.js",
+    "highlow.js",
     "site-brand.js",
     "trainer-results.js",
   ]) {

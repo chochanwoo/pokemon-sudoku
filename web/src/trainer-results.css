@@ -111,6 +111,14 @@
 .trainer-rank-guide dt {
   min-width: 0;
 }
+.trainer-pool-names {
+  display: block;
+  margin: 2px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 .trainer-rank-guide dd {
   margin: 0;
   flex-shrink: 0;
@@ -179,6 +187,18 @@
   font-size: 14px;
   color: #53625d;
   line-height: 1.5;
+}
+.trainer-taunt {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-block: 1px solid #dba09d;
+  color: #9a4645;
+  background: #fbeceb;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .trainer-answer {
   display: flex;

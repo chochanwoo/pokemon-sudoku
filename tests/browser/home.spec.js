@@ -15,6 +15,11 @@ test("every page shares the same home brand and game logos return to the library
     ],
     ["pokemantle", "./pokemantle.html?date=2026-09-10", "포맨틀 | 포켓몬 퀴즈"],
     ["pokeclue", "./pokeclue.html?date=2026-09-10", "포케클루 | 포켓몬 퀴즈"],
+    [
+      "highlow",
+      "./highlow.html?date=2026-09-10",
+      "포케 하이로우 | 포켓몬 퀴즈",
+    ],
   ]) {
     await page.goto(path);
     const brand = page.getByRole("link", {

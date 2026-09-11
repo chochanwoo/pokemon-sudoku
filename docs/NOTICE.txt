@@ -10,6 +10,14 @@ Bundled unchanged: red.png (Red, HGSS), cynthia-gen4.png (Cynthia, DPPt),
 volkner.png (Volkner), cheryl.png (Cheryl), acetrainer-gen4dp.png
 (DP male Ace Trainer, used by Felix/Butler), youngster-gen4.png
 (HGSS Youngster, used by Joey).
+Additional unchanged sprites: lance.png, blue.png (HGSS); gardenia.png,
+candice.png, roark.png, mira.png, marley.png, acetrainerf-gen4dp.png (DPPt).
+The DP female Ace Trainer sprite represents Dana and Sandra on Route 229.
+Trainer catalog: web/src/trainers.json. Blue is in the former Champion pool;
+Cheryl, Mira and Marley are the partner-trainer pool for the regular tier.
+Route 229 trainer names and localization references:
+https://pokemon.fandom.com/ko/wiki/229%EB%B2%88%EB%8F%84%EB%A1%9C
+https://bulbapedia.bulbagarden.net/wiki/Sinnoh_Route_229
 These are game sprites, not original artwork created for this project.
 Original character and sprite rights remain with Nintendo, Creatures and
 GAME FREAK; the hosting project does not grant rights to Pokemon artwork.

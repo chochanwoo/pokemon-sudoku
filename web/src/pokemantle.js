@@ -33,6 +33,7 @@ import {
 } from "./similarity-engine.js";
 import { siteBrand, languagePicker } from "./site-brand.js";
 import { rankFor } from "./trainer-ranks.js";
+import { trainerResultKey } from "./trainers.js";
 import {
   rankName,
   trainerBadge,
@@ -138,6 +139,8 @@ const badges = (p) =>
     })
     .join("");
 const hints = () => round.guesses.filter((g) => g.hint).length;
+const trainerKey = (day = round.day, attempts = round.guesses.length) =>
+  trainerResultKey("pokemantle", day, attempts);
 const ended = () => round.gaveUp || isWon(round, target);
 function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.8 } });
@@ -398,7 +401,7 @@ function render() {
   if (ended()) {
     const p = game.byId.get(target);
     document.querySelector("#answer-panel").innerHTML =
-      `${sprite(p)}<div class="pm-answer-details"><span>${t(isWon(round, target) ? "정답!" : "오늘의 정답")}</span><h2 id="answer-title" tabindex="-1">${esc(pokemonName(p))}</h2><div class="pm-answer-types">${badges(p)}</div></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button>${isWon(round, target) ? `<div class="pm-result-rank">${trainerReplay(rankFor(round.guesses.length))}<span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}`;
+      `${sprite(p)}<div class="pm-answer-details"><span>${t(isWon(round, target) ? "정답!" : "오늘의 정답")}</span><h2 id="answer-title" tabindex="-1">${esc(pokemonName(p))}</h2><div class="pm-answer-types">${badges(p)}</div></div><button class="text-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button>${isWon(round, target) ? `<div class="pm-result-rank">${trainerReplay(rankFor(round.guesses.length), "", trainerKey())}<span>${t("{count}번 만에 정답", { count: round.guesses.length })}</span></div>` : ""}`;
   }
   document.querySelector("#first-guesses").hidden = round.guesses.length > 0;
   document.querySelector("#first-guesses").innerHTML = [1, 6, 25, 94, 131]
@@ -530,6 +533,7 @@ function showTrainerResult() {
     "도전 완료",
     trainerResult({
       attempts: round.guesses.length,
+      resultKey: trainerKey(),
       context: `${t("포맨틀")} · ${round.day}`,
       answerName: pokemonName(p),
       answerSprite: sprite(p),
@@ -575,7 +579,7 @@ async function share() {
   url.search = "";
   url.hash = "";
   url.searchParams.set("date", round.day);
-  const text = `${t("포맨틀")} ${round.day}\n${isWon(round, target) ? t("{rank} · {count}번 만에 정답", { rank: rankName(rankFor(round.guesses.length)), count: round.guesses.length }) : t("도전 종료")} · ${t("힌트 {count}회", { count: hints() })}\n${url.href}`;
+  const text = `${t("포맨틀")} ${round.day}\n${isWon(round, target) ? t("{rank} · {count}번 만에 정답", { rank: rankName(rankFor(round.guesses.length), trainerKey()), count: round.guesses.length }) : t("도전 종료")} · ${t("힌트 {count}회", { count: hints() })}\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
       await navigator.share({ title: t("포맨틀"), text });
@@ -679,7 +683,7 @@ function onClick(event) {
             .slice(0, 8)
             .map(
               (r) =>
-                `<div><span>${esc(r.day)}<small>${t("힌트 {count}회", { count: r.hints || 0 })}</small></span><strong class="pm-record-result">${r.won ? trainerBadge(rankFor(r.attempts)) : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
+                `<div><span>${esc(r.day)}<small>${t("힌트 {count}회", { count: r.hints || 0 })}</small></span><strong class="pm-record-result">${r.won ? trainerBadge(rankFor(r.attempts), "", trainerKey(r.day, r.attempts)) : ""}<span>${r.won ? t("{count}회 정답", { count: r.attempts }) : t("도전 종료")}</span></strong></div>`,
             )
             .join("") ||
           `<p class="dialog-copy">${t("아직 완료한 도전이 없어요.")}</p>`

@@ -1,5 +1,6 @@
 import { GUESS_RANKS, rankFor } from "./trainer-ranks.js";
-import { t } from "./i18n.js";
+import { t, getLanguage } from "./i18n.js";
+import { TRAINERS, trainerFor } from "./trainers.js";
 import "./trainer-results.css";
 
 const images = import.meta.glob("./assets/trainers/*.png", {
@@ -20,11 +21,13 @@ const esc = (value) =>
       })[c],
   );
 const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
-export const rankName = (rank) =>
-  t(GUESS_RANKS.find((tier) => tier.rank === rank)?.label || "-");
+export const rankName = (rank, resultKey = "") => {
+  const trainer = trainerFor(rank, resultKey);
+  return trainer ? t("{trainer}급", { trainer: trainer[getLanguage()] }) : "-";
+};
 
-function portrait(rank) {
-  const tier = GUESS_RANKS.find((tier) => tier.rank === rank);
+function portrait(rank, resultKey = "") {
+  const tier = trainerFor(rank, resultKey);
   const src = tier && images[`./assets/trainers/${tier.sprite}.png`];
   return `<span class="trainer-portrait${src ? "" : " is-missing"}" aria-hidden="true">${src ? `<img data-trainer src="${src}" alt="" width="80" height="80" draggable="false" />` : ""}<span class="trainer-image-fallback">${icon("trophy")}</span></span>`;
 }
@@ -34,13 +37,26 @@ export function onTrainerImageError(event) {
     event.target.parentElement.classList.add("is-missing");
 }
 
-export function trainerBadge(rank, extraClass = "") {
+export function trainerBadge(rank, extraClass = "", resultKey = "") {
   if (!rank) return "";
-  return `<span class="trainer-badge trainer-tier-${rank} ${extraClass}">${portrait(rank)}<span>${esc(rankName(rank))}</span></span>`;
+  return `<span class="trainer-badge trainer-tier-${rank} ${extraClass}" data-trainer-id="${trainerFor(rank, resultKey)?.id || ""}">${portrait(rank, resultKey)}<span>${esc(rankName(rank, resultKey))}</span></span>`;
 }
 
-export function trainerReplay(rank, extraClass = "") {
-  return `<button class="trainer-replay" data-action="trainer-result" aria-label="${esc(t("{rank} · 등급 다시 보기", { rank: rankName(rank) }))}" data-tooltip="${t("등급 다시 보기")}">${trainerBadge(rank, extraClass)}${icon("chevron-down")}</button>`;
+export function trainerReplay(rank, extraClass = "", resultKey = "") {
+  return `<button class="trainer-replay" data-action="trainer-result" aria-label="${esc(t("{rank} · 등급 다시 보기", { rank: rankName(rank, resultKey) }))}" data-tooltip="${t("등급 다시 보기")}">${trainerBadge(rank, extraClass, resultKey)}${icon("chevron-down")}</button>`;
+}
+
+export function trainerTaunt(rank) {
+  return rank === "E"
+    ? `<p class="trainer-taunt">${esc(t("꼬마야, 더 배우고 와~"))}</p>`
+    : "";
+}
+
+export function trainerGuideBadge(rank) {
+  const others = TRAINERS[rank]
+    .slice(1)
+    .map((trainer) => trainer[getLanguage()]);
+  return `${trainerBadge(rank)}${others.length ? `<small class="trainer-pool-names">${esc(others.join(" · "))}</small>` : ""}`;
 }
 
 export function trainerGuide(extraClass = "", ranks = GUESS_RANKS) {
@@ -50,7 +66,7 @@ export function trainerGuide(extraClass = "", ranks = GUESS_RANKS) {
       const range = Number.isFinite(tier.max)
         ? t("{min}~{max}회", { min, max: tier.max })
         : t("{min}회 이상", { min });
-      return `<div><dt>${trainerBadge(tier.rank)}</dt><dd>${range}</dd></div>`;
+      return `<div><dt>${trainerGuideBadge(tier.rank)}</dt><dd>${range}</dd></div>`;
     })
     .join("")}</dl></section>`;
 }
@@ -63,14 +79,16 @@ export function trainerResult({
   hints,
   legacyWin,
   ranks = GUESS_RANKS,
+  resultKey = "",
 }) {
   const rank = rankFor(attempts, ranks);
   if (!rank) return "";
-  return `<div class="trainer-award trainer-tier-${rank}" data-trainer-rank="${rank}">
+  return `<div class="trainer-award trainer-tier-${rank}" data-trainer-rank="${rank}" data-trainer-id="${trainerFor(rank, resultKey).id}">
     <p class="trainer-context">${esc(context)}</p>
-    <div class="trainer-stage">${portrait(rank)}</div>
+    <div class="trainer-stage">${portrait(rank, resultKey)}</div>
     <p class="trainer-kicker">${t("당신의 트레이너 등급")}</p>
-    <h3 class="trainer-award-title">${esc(rankName(rank))}</h3>
+    <h3 class="trainer-award-title">${esc(rankName(rank, resultKey))}</h3>
+    ${trainerTaunt(rank)}
     <p class="trainer-attempts">${t("{count}번 만에 정답", { count: attempts })}</p>
     <div class="trainer-answer">${answerSprite}<div><span>${t("정답")}</span><strong>${esc(answerName)}</strong></div></div>
     ${Number.isInteger(hints) ? `<p class="trainer-hints">${t("힌트 {count}회", { count: hints })}</p>` : ""}

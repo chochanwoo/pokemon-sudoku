@@ -16,3 +16,27 @@ export function rankFor(attempts, ranks = GUESS_RANKS) {
   if (!Number.isInteger(attempts) || attempts < 1) return null;
   return ranks.find((tier) => attempts <= tier.max).rank;
 }
+
+export const HIGHLOW_STREAK_RANKS = Object.fromEntries(
+  Object.entries({
+    normal: [20, 15, 10, 6, 3, 0],
+    hard: [12, 9, 6, 4, 2, 0],
+  }).map(([difficulty, minimums]) => [
+    difficulty,
+    GUESS_RANKS.map(({ max, ...trainer }, index) => ({
+      ...trainer,
+      min: minimums[index],
+    })),
+  ]),
+);
+
+export function streakRankFor(streak, difficulty = "normal") {
+  if (
+    !Number.isInteger(streak) ||
+    streak < 0 ||
+    !Object.hasOwn(HIGHLOW_STREAK_RANKS, difficulty)
+  )
+    return null;
+  return HIGHLOW_STREAK_RANKS[difficulty].find((tier) => streak >= tier.min)
+    .rank;
+}

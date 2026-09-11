@@ -10,6 +10,7 @@ import {
   newRound as mantleRound,
 } from "../../web/src/similarity-engine.js";
 import { isPlayableForm } from "../../web/src/form-policy.js";
+import { trainerFor, trainerResultKey } from "../../web/src/trainers.js";
 
 const read = (name) =>
   JSON.parse(
@@ -22,7 +23,7 @@ const setups = [
   {
     name: "pokemantle",
     tierAttempts: [5, 10, 20, 30, 40, 41],
-    sixthGuessRank: "난천급",
+    sixthGuessRank: "A",
     dialog: "#pm-dialog",
     input: "#guess-input",
     options: "#guess-options",
@@ -41,7 +42,7 @@ const setups = [
   {
     name: "pokeclue",
     tierAttempts: [3, 5, 8, 11, 15, 16],
-    sixthGuessRank: "전진급",
+    sixthGuessRank: "B",
     dialog: "#cq-dialog",
     input: "#cq-input",
     options: "#cq-options",
@@ -58,14 +59,13 @@ const setups = [
     guesses: (ids) => ids,
   },
 ];
-const tiers = [
-  ["S", "레드급", "Red tier", "red"],
-  ["A", "난천급", "Cynthia tier", "cynthia-gen4"],
-  ["B", "전진급", "Volkner tier", "volkner"],
-  ["C", "버틀러급", "Felix tier", "acetrainer-gen4dp"],
-  ["D", "모미급", "Cheryl tier", "cheryl"],
-  ["E", "오성급", "Joey tier", "youngster-gen4"],
-];
+const tiers = ["S", "A", "B", "C", "D", "E"];
+const resultKey = (setup, attempts) =>
+  trainerResultKey(
+    setup.name,
+    setup.name === "pokeclue" ? `daily:${day}` : day,
+    attempts,
+  );
 
 async function seed(page, setup, ids, gaveUp = false, record = false) {
   const round = { ...setup.round, guesses: setup.guesses(ids), gaveUp };
@@ -103,6 +103,7 @@ async function realGuess(page, setup, id) {
 }
 
 for (const setup of setups) {
+  const sixthGuessRank = `${trainerFor(setup.sixthGuessRank, resultKey(setup, 6)).ko}급`;
   test(`${setup.name}: a new win opens the trainer popup once, counts hints, shares without the answer and restores focus`, async ({
     page,
   }) => {
@@ -115,7 +116,7 @@ for (const setup of setups) {
     const popup = page.locator(`${setup.dialog}.trainer-dialog`);
     await expect(popup).toBeVisible();
     await expect(popup.locator(".trainer-award-title")).toHaveText(
-      setup.sixthGuessRank,
+      sixthGuessRank,
     );
     await expect(popup.locator(".trainer-attempts")).toHaveText(
       "6번 만에 정답",
@@ -142,7 +143,7 @@ for (const setup of setups) {
     );
     await popup.locator('[data-action="share-award"]').click();
     const shared = await page.evaluate(() => window.trainerShare);
-    expect(shared).toContain(`${setup.sixthGuessRank} · 6번 만에 정답`);
+    expect(shared).toContain(`${sixthGuessRank} · 6번 만에 정답`);
     expect(shared).not.toContain(
       catalog.pokemon.find((p) => p.id === setup.round.target).name,
     );
@@ -153,12 +154,10 @@ for (const setup of setups) {
     await expect(popup).toBeVisible();
     await popup.getByRole("button", { name: "계속 보기", exact: true }).click();
     await page.reload();
-    await expect(page.locator(setup.rank)).toContainText(setup.sixthGuessRank);
+    await expect(page.locator(setup.rank)).toContainText(sixthGuessRank);
     await expect(page.locator(`${setup.dialog}[open]`)).toHaveCount(0);
     await page.locator('[data-action="stats"]').click();
-    await expect(page.locator(setup.record)).toContainText(
-      setup.sixthGuessRank,
-    );
+    await expect(page.locator(setup.record)).toContainText(sixthGuessRank);
     expect(errors).toEqual([]);
   });
 
@@ -168,8 +167,12 @@ for (const setup of setups) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`./${setup.name}.html?date=${day}`);
     const pixels = [];
-    for (const [index, [rank, ko, en, sprite]] of tiers.entries()) {
+    for (const [index, rank] of tiers.entries()) {
       const attempts = setup.tierAttempts[index];
+      const trainer = trainerFor(rank, resultKey(setup, attempts));
+      const { sprite } = trainer;
+      const ko = `${trainer.ko}급`,
+        en = `${trainer.en} tier`;
       await seed(
         page,
         setup,
@@ -186,6 +189,17 @@ for (const setup of setups) {
         await page.locator('[data-action="trainer-result"]').click();
         const popup = page.locator(`${setup.dialog}.trainer-dialog`);
         await expect(popup.locator(".trainer-award-title")).toHaveText(name);
+        await expect(popup.locator(".trainer-award")).toHaveAttribute(
+          "data-trainer-id",
+          trainer.id,
+        );
+        if (rank === "E")
+          await expect(popup.locator(".trainer-taunt")).toHaveText(
+            language === "ko"
+              ? "꼬마야, 더 배우고 와~"
+              : "Hey kid, come back after some more training~",
+          );
+        else await expect(popup.locator(".trainer-taunt")).toHaveCount(0);
         await expect(popup.locator("[data-trainer-rank]")).toHaveAttribute(
           "data-trainer-rank",
           rank,
@@ -232,7 +246,7 @@ for (const setup of setups) {
           expect(
             await popup
               .locator(
-                ".trainer-award-title, .trainer-answer strong, .trainer-attempts, button",
+                ".trainer-award-title, .trainer-answer strong, .trainer-attempts, .trainer-taunt, button",
               )
               .evaluateAll((els) =>
                 els.every((el) => el.scrollWidth <= el.clientWidth + 1),

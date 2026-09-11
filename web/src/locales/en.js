@@ -1,5 +1,7 @@
 // Korean source messages are the default locale and the translation keys.
 export default {
+  "{trainer}급": "{trainer} tier",
+  "꼬마야, 더 배우고 와~": "Hey kid, come back after some more training~",
   트레이너: "Trainer",
   "도전 완료": "Challenge complete",
   "당신의 트레이너 등급": "Your trainer rank",
@@ -302,4 +304,60 @@ export default {
     "The daily puzzle changes at midnight in Korea (UTC+9). Practice is separate from daily records. Progress is saved in this browser.",
   "데일리 기록": "Daily records",
   "오늘의 단서를 준비하고 있어요": "Loading today's clues",
+  "포케 하이로우": "Poke High Low",
+  일반: "Normal",
+  하드: "Hard",
+  "일반은 종족값 합계, 하드는 매 대결에 지정된 개별 능력치를 비교합니다. 더 높은 포켓몬을 선택하면 양쪽 수치를 공개합니다.":
+    "Normal compares base stat totals. Hard compares the individual stat named in each showdown. Pick the Pokemon with the higher value to reveal both numbers.",
+  "하드는 HP·공격·방어·특수공격·특수방어·스피드가 번갈아 출제됩니다. 레벨, 성격, 노력치 등은 반영하지 않으며 메가·리전 폼은 해당 모습의 종족값을 사용합니다.":
+    "Hard cycles through HP, Attack, Defense, Sp. Atk, Sp. Def and Speed. Level, nature and EVs do not apply. Mega and regional forms use their own base stats.",
+  "난이도마다 데일리·연습·최고 기록을 따로 저장합니다. 같은 난이도의 데일리는 모두에게 같은 순서로 출제되며 한국 시간 자정에 바뀝니다. 기존 개별 능력치 기록은 하드에서 이어집니다.":
+    "Each difficulty saves daily progress, practice and personal bests separately. Everyone gets the same daily sequence for that difficulty, changing at midnight in Korea (UTC+9). Previous individual-stat records continue in Hard.",
+  "포케 하이로우 | 포켓몬 퀴즈": "Poke High Low | Pokemon Quiz",
+  "종족값 대결": "Base stat showdown",
+  "두 포켓몬의 종족값을 비교하는 포케 하이로우 대결":
+    "A Poke High Low showdown comparing two Pokemon's base stats",
+  공격: "Attack",
+  방어: "Defense",
+  특수공격: "Sp. Atk",
+  특수방어: "Sp. Def",
+  스피드: "Speed",
+  "새로운 오늘의 대결이 열렸어요.": "A new daily showdown is ready.",
+  "오늘의 문제": "Today's challenge",
+  "현재 기록": "Current record",
+  "연속 정답": "Streak",
+  "내 최고": "Personal best",
+  "브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.":
+    "Browser storage is unavailable. Progress will not be saved.",
+  "다음 대결": "Next showdown",
+  "최근 대결": "Recent showdowns",
+  "{count}번째 대결": "Showdown {count}",
+  "{stat}, 어느 쪽이 더 높을까?": "Which has higher {stat}?",
+  "{pokemon} 선택": "Choose {pokemon}",
+  "더 높은 쪽": "Higher",
+  "더 낮은 쪽": "Lower",
+  "내 선택": "Your pick",
+  "이쪽이 더 높다": "This one is higher",
+  "{count}연속으로 도전 종료": "Round over: {count} in a row",
+  "{count}연속 정답!": "{count} in a row!",
+  "{count}연속 정답": "{count} in a row",
+  "{min}~{max}연속 정답": "{min}-{max} in a row",
+  "{min}연속 정답 이상": "{min}+ in a row",
+  오답: "Incorrect",
+  "도전 완료": "Challenge complete",
+  "최고 기록!": "Personal best!",
+  "다음 도전을 기다릴게요.": "Another challenge awaits.",
+  "새 연습 시작": "Start new practice",
+  "포케 하이로우 규칙": "Poke High Low rules",
+  "제시된 능력치의 종족값이 더 높은 포켓몬을 고릅니다. 선택하면 양쪽 수치를 공개합니다.":
+    "Choose the Pokemon with the higher base stat for the named attribute. Both values are revealed after your pick.",
+  "맞히면 다음 대결로 이어지고, 한 번 틀리면 도전이 끝납니다. 동률인 문제는 나오지 않습니다.":
+    "A correct pick continues your streak. One wrong pick ends the challenge. Tied values are never paired.",
+  "HP·공격·방어·특수공격·특수방어·스피드를 비교합니다. 레벨, 성격, 노력치 등은 반영하지 않으며 메가·리전 폼은 해당 모습의 종족값을 사용합니다.":
+    "Compare HP, Attack, Defense, Sp. Atk, Sp. Def and Speed. Level, nature and EVs do not apply. Mega and regional forms use their own base stats.",
+  "데일리는 모두에게 같은 순서로 출제되며 한국 시간 자정에 바뀝니다. 연습은 별도로 저장되고 새 연습으로 다시 도전할 수 있습니다.":
+    "Everyone gets the same daily sequence, changing at midnight in Korea (UTC+9). Practice is saved separately. Start a new practice to play again.",
+  "오늘의 대결을 준비하고 있어요": "Loading today's showdown",
+  "연결을 확인하고 다시 시도해 주세요.": "Check your connection and try again.",
+  "다시 시도": "Try again",
 };
