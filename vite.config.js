@@ -31,6 +31,7 @@ export default defineConfig({
         );
         // Embed unchanged PNG bytes so browser uploads stay under GitHub's 100-file limit.
         for (const pokemon of catalog.pokemon) {
+          if (pokemon.image) continue;
           const bytes = await readFile(
             new URL(`sprites/${pokemon.id}.png`, publicDirectory),
           );
@@ -43,6 +44,7 @@ export default defineConfig({
         });
         for (const fileName of [
           "puzzles.json",
+          "puzzles-v2.json",
           "pokemantle.json",
           "pokemantle-scores.bin",
           "NOTICE.txt",

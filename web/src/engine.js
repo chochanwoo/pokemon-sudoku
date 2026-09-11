@@ -426,18 +426,28 @@ export function initials(name) {
 }
 
 export function searchPokemon(pokemon, query) {
-  const q = query.trim().toLowerCase().replace(/\s/g, "");
-  return pokemon.filter(
-    (p) =>
-      !q ||
+  const normalize = (value) =>
+    String(value)
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]/gu, "");
+  const tokens = query.trim().split(/\s+/).map(normalize).filter(Boolean);
+  return pokemon.filter((p) =>
+    tokens.every((token) =>
       [
         p.name,
         p.english,
         englishName(p),
         p.key,
+        p.baseName,
+        p.form,
+        p.speciesId,
         String(p.id),
         initials(p.name),
-      ].some((value) => value.toLowerCase().replace(/\s/g, "").includes(q)),
+        ...(p.aliases || []),
+      ]
+        .filter((value) => value !== undefined)
+        .some((value) => normalize(value).includes(token)),
+    ),
   );
 }
 

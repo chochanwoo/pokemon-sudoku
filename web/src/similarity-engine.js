@@ -1,5 +1,6 @@
 import { dayKey, initials } from "./engine.js";
 import { englishName } from "./pokemon-names.js";
+import { isPlayableForm } from "./form-policy.js";
 
 export { dayKey };
 export const MAX_HINTS = 3;
@@ -25,12 +26,13 @@ export function resolveDay(value, today = dayKey()) {
   return validDay(value) && value <= today ? value : today;
 }
 
-export function dailyTarget(data, day) {
+function scheduledTarget(data, day) {
   if (!validDay(day)) throw new Error("Invalid puzzle date");
   let seed = 2166136261;
   for (const char of data.version)
     seed = Math.imul(seed ^ char.charCodeAt(0), 16777619) >>> 0;
   const ids = data.pokemon.map((p) => p.id).sort((a, b) => a - b);
+  if (!ids.length) throw new Error("No Pokemon forms");
   for (let i = ids.length - 1; i > 0; i--) {
     seed ^= seed << 13;
     seed ^= seed >>> 17;
@@ -42,13 +44,28 @@ export function dailyTarget(data, day) {
   return ids[((dayNumber % ids.length) + ids.length) % ids.length];
 }
 
+export function dailyTarget(data, day) {
+  const id = scheduledTarget(data, day);
+  const scheduled = data.pokemon.find((p) => p.id === id);
+  if (isPlayableForm(scheduled)) return scheduled.id;
+  // Keep ordinary dates stable and replace removed answers with a base counterpart.
+  const counterpart = data.pokemon
+    .filter((p) => p.speciesId === scheduled.speciesId && isPlayableForm(p))
+    .sort((a, b) => a.id - b.id)[0];
+  if (!counterpart)
+    throw new Error("Excluded form has no playable counterpart");
+  return counterpart.id;
+}
+
 export function createSimilarity(data, buffer) {
   const count = data.pokemon.length;
   if (!count || buffer.byteLength !== count * count * 2)
     throw new Error("Invalid similarity matrix");
-  const byId = new Map(data.pokemon.map((p) => [p.id, p]));
-  if (byId.size !== count) throw new Error("Duplicate form IDs");
   const index = new Map(data.pokemon.map((p, i) => [p.id, i]));
+  if (index.size !== count) throw new Error("Duplicate form IDs");
+  // Matrix offsets retain the raw catalog order; only gameplay uses the filtered pool.
+  const pokemon = data.pokemon.filter(isPlayableForm);
+  const byId = new Map(pokemon.map((p) => [p.id, p]));
   const matrix = new DataView(buffer);
   const score = (a, b) => {
     if (!index.has(a) || !index.has(b)) throw new Error("Unknown Pokemon form");
@@ -57,7 +74,8 @@ export function createSimilarity(data, buffer) {
     );
   };
   const ranking = (target) => {
-    const rows = data.pokemon
+    if (!byId.has(target)) throw new Error("Unknown playable Pokemon form");
+    const rows = pokemon
       .map((p) => ({ id: p.id, score: score(target, p.id) }))
       .sort((a, b) => b.score - a.score || a.id - b.id);
     let rank = 1;
@@ -66,11 +84,17 @@ export function createSimilarity(data, buffer) {
       return { ...row, rank };
     });
   };
-  return { byId, score, ranking };
+  return { pokemon, byId, score, ranking };
 }
 
 export function newRound(data, day) {
-  return { version: data.version, day, guesses: [], gaveUp: false };
+  return {
+    version: data.version,
+    day,
+    target: dailyTarget(data, day),
+    guesses: [],
+    gaveUp: false,
+  };
 }
 
 export function isWon(round, target) {
@@ -82,10 +106,12 @@ export function restoreRound(raw, data, day) {
   try {
     const value = JSON.parse(raw);
     const ids = new Set(data.pokemon.map((p) => p.id));
+    const target = dailyTarget(data, day);
     if (
       !value ||
       value.version !== data.version ||
       value.day !== day ||
+      (value.target ?? scheduledTarget(data, day)) !== target ||
       typeof value.gaveUp !== "boolean" ||
       !Array.isArray(value.guesses) ||
       value.guesses.length > ids.size ||
@@ -96,18 +122,21 @@ export function restoreRound(raw, data, day) {
       value.guesses.filter((g) => g.hint).length > MAX_HINTS
     )
       return fallback();
-    const targetIndex = value.guesses.findIndex(
-      (g) => g.id === dailyTarget(data, day),
+    const playableIds = new Set(
+      data.pokemon.filter(isPlayableForm).map((p) => p.id),
     );
+    const guesses = value.guesses.filter((g) => playableIds.has(g.id));
+    const targetIndex = guesses.findIndex((g) => g.id === target);
     if (
       targetIndex >= 0 &&
-      (targetIndex !== value.guesses.length - 1 || value.gaveUp)
+      (targetIndex !== guesses.length - 1 || value.gaveUp)
     )
       return fallback();
     return {
       version: value.version,
       day,
-      guesses: value.guesses,
+      target,
+      guesses,
       gaveUp: value.gaveUp,
     };
   } catch {
@@ -117,7 +146,7 @@ export function restoreRound(raw, data, day) {
 
 export function submitGuess(round, id, target, byId, hint = false) {
   if (round.gaveUp || isWon(round, target)) return "finished";
-  if (!byId.has(id)) return "unknown";
+  if (!byId.has(id) || !isPlayableForm(byId.get(id))) return "unknown";
   if (round.guesses.some((g) => g.id === id)) return "duplicate";
   if (hint && round.guesses.filter((g) => g.hint).length >= MAX_HINTS)
     return "hints-used";
@@ -147,6 +176,7 @@ export function searchForms(pokemon, query) {
   const tokens = query.trim().split(/\s+/).map(normalize).filter(Boolean);
   if (!tokens.length) return [];
   return pokemon.filter((p) => {
+    if (!isPlayableForm(p)) return false;
     const words = [
       p.name,
       p.baseName,

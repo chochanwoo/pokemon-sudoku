@@ -1099,6 +1099,23 @@ h1 {
   gap: 4px;
   margin-top: 6px;
 }
+.with-forms .pokemon-choice {
+  height: 152px;
+  padding-top: 18px;
+}
+.with-forms .pokemon-choice .sprite {
+  height: 54px;
+  flex-shrink: 0;
+}
+.with-forms .choice-name {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  flex-shrink: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 14px;
+}
 .choice-types .type-badge {
   --type-size: 18px;
 }

@@ -188,6 +188,14 @@
   height: 18px;
   object-fit: contain;
 }
+.pm-type-unknown {
+  color: #7a8491;
+}
+.pm-type-unknown svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .pm-starters {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

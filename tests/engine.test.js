@@ -45,7 +45,7 @@ const fixture = () => {
 test("all generated puzzles and randomized permutations satisfy dual-type Sudoku constraints", () => {
   for (const base of pack) {
     assert.equal(base.uniquePokemon, true);
-    assert.match(base.id, /^v2-/);
+    assert.match(base.id, /^v3-/);
     for (const key of new Set(base.solution.map(pairKey))) {
       assert.ok(
         base.solution.filter((pair) => pairKey(pair) === key).length <=
@@ -489,7 +489,10 @@ test("Korean, initials, English and dex number search work and every sprite is l
     assert.ok(searchPokemon(catalog.pokemon, query).some((p) => p.id === 1));
   for (const p of catalog.pokemon)
     assert.ok(
-      existsSync(new URL(`../web/public/sprites/${p.id}.png`, import.meta.url)),
+      p.image?.startsWith("data:image/png;base64,") ||
+        existsSync(
+          new URL(`../web/public/sprites/${p.id}.png`, import.meta.url),
+        ),
     );
 });
 
@@ -516,4 +519,45 @@ test("all 18 types have distinct, local SVG icons and bundled license credits", 
   );
   assert.match(notice, /Copyright \(c\) 2022 James Watkins/);
   assert.match(notice, /MIT License/);
+});
+
+test("Mega and regional forms are distinct, searchable by species number and playable with their actual types", () => {
+  assert.equal(catalog.pokemon.filter((p) => p.isAlternate).length, 126);
+  assert.equal(catalog.pokemon.length, 652);
+  assert.equal(new Set(catalog.pokemon.map((p) => p.id)).size, 652);
+  const forms = new Map(catalog.pokemon.map((p) => [p.key, p]));
+  const mega = forms.get("charizard-mega-x"),
+    regional = forms.get("raichu-alola");
+  assert.deepEqual(mega.types, [10, 16]);
+  assert.deepEqual(regional.types, [13, 14]);
+  for (const query of ["메가리자몽X", "리자몽 메가 X", "Mega Charizard X", "6"])
+    assert.ok(
+      searchPokemon(catalog.pokemon, query).some((p) => p.id === mega.id),
+      query,
+    );
+  for (const query of ["알로라라이츄", "라이츄 알로라", "Alolan Raichu", "26"])
+    assert.ok(
+      searchPokemon(catalog.pokemon, query).some((p) => p.id === regional.id),
+      query,
+    );
+  assert.ok(!forms.has("vulpix-alola"));
+  const puzzle = makePuzzle(pack, catalog, {
+    size: 9,
+    difficulty: "hard",
+    seed: "forms",
+  });
+  const state = newState(puzzle);
+  const index = puzzle.givens.findIndex((given) => !given);
+  const form = catalog.pokemon.find(
+    (p) => p.isAlternate && !state.entries.includes(p.id),
+  );
+  assert.ok(puzzle.representatives.some((id) => byId.get(id).isAlternate));
+  assert.ok(placePokemon(puzzle, state, byId, index, form.id));
+  assert.deepEqual(restoreState(JSON.stringify(state), puzzle, byId), state);
+  const other = puzzle.givens.findIndex((given, i) => !given && i !== index);
+  assert.equal(placePokemon(puzzle, state, byId, other, form.id), false);
+  assert.ok(undo(state));
+  assert.equal(state.entries[index], null);
+  assert.ok(redo(state));
+  assert.equal(state.entries[index], form.id);
 });

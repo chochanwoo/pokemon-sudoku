@@ -4,9 +4,9 @@ export default {
   "포켓몬 퀴즈": "Pokemon Quiz",
   "포켓몬 퀴즈 메인으로": "Pokemon Quiz home",
   타입도쿠: "Typedoku",
-  포케맨틀: "Pokemantle",
+  포맨틀: "Pokemantle",
   "타입도쿠 | 포켓몬 퀴즈": "Typedoku | Pokemon Quiz",
-  "포케맨틀 | 포켓몬 퀴즈": "Pokemantle | Pokemon Quiz",
+  "포맨틀 | 포켓몬 퀴즈": "Pokemantle | Pokemon Quiz",
   "비공식 팬 게임": "Unofficial fan game",
   "전체 게임": "All games",
   "{count}개 게임": "{count} games",
@@ -17,7 +17,7 @@ export default {
   "데이터 · PokéAPI": "Data · PokeAPI",
   "포켓몬과 타입 아이콘이 배치된 타입도쿠 4 × 4 보드":
     "A 4 × 4 Typedoku board with Pokemon and type icons",
-  "추측한 포켓몬의 유사도와 순위가 표시된 포케맨틀 기록":
+  "추측한 포켓몬의 유사도와 순위가 표시된 포맨틀 기록":
     "Pokemantle guesses with similarity scores and ranks",
   "게임 메뉴": "Game menu",
   "내 기록": "My stats",
@@ -152,6 +152,10 @@ export default {
   "저장 공간을 사용할 수 없어요. 이번 게임은 저장되지 않습니다.":
     "Browser storage is unavailable. This game will not be saved.",
   "이미지 미제공": "Image unavailable",
+  "알 수 없는 타입": "Unknown type",
+  "기본·메가·리전 폼": "Base, Mega & regional forms",
+  "기본 폼과 메가진화·지역 폼 중 두 타입을 가진 {count}개 모습을 사용합니다. 서로 다른 모습은 별개의 포켓몬으로 취급합니다.":
+    "Uses {count} dual-type base, Mega and regional forms. Different forms count as separate Pokemon.",
   "새로운 오늘의 포켓몬이 도착했어요.": "A new daily Pokemon is ready.",
   "오늘의 문제": "Today's puzzle",
   "오늘의 포켓몬": "Today's Pokemon",
@@ -209,9 +213,9 @@ export default {
   "정답을 공개할까요?": "Reveal the answer?",
   "이 문제의 도전이 종료됩니다.": "This will end the current round.",
   "정답 공개": "Reveal answer",
-  "포케맨틀 규칙": "Pokemantle rules",
-  "하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 알로라·가라르·히스이·팔데아, 메가진화와 외형 차이도 각각 별개의 정답입니다.":
-    "Guess the <strong>exact Pokemon form</strong> each day. Alolan, Galarian, Hisuian, Paldean, Mega and other visual forms are separate answers.",
+  "포맨틀 규칙": "Pokemantle rules",
+  "하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 리전 폼·메가진화 등은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.":
+    "Guess the <strong>exact Pokemon form</strong> each day. Regional, Mega and other forms are separate answers, except for selected event and commemorative variants.",
   "유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.":
     "Higher similarity means a closer match. Only the exact answer scores <strong>100 and ranks #1.</strong> Equal scores share a rank.",
   "힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.":

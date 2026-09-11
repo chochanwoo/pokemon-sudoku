@@ -16,12 +16,12 @@ export const games = [
   },
   {
     id: "pokemantle",
-    title: "포케맨틀",
+    title: "포맨틀",
     category: "유사도 추리",
     formats: "데일리",
     href: "./pokemantle.html",
     image: pokemantlePreview,
     imageEn: pokemantlePreviewEn,
-    imageAlt: "추측한 포켓몬의 유사도와 순위가 표시된 포케맨틀 기록",
+    imageAlt: "추측한 포켓몬의 유사도와 순위가 표시된 포맨틀 기록",
   },
 ];

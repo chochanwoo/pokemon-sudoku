@@ -116,7 +116,16 @@ const badges = (p) =>
   p.types
     .map((id) => {
       const type = typeById.get(id);
-      return `<img class="pm-type" src="${typeImages[`./assets/types/${type.key}.svg`]}" alt="${esc(t("{type} 타입", { type: typeName(type) }))}" title="${esc(typeName(type))}" width="18" height="18" />`;
+      const src = type && typeImages[`./assets/types/${type.key}.svg`];
+      const name = type
+        ? typeName(type)
+        : id === 10001
+          ? "???"
+          : t("알 수 없는 타입");
+      const label = esc(t("{type} 타입", { type: name }));
+      return src
+        ? `<img class="pm-type" src="${src}" alt="${label}" title="${esc(name)}" width="18" height="18" />`
+        : `<span class="pm-type pm-type-unknown" role="img" aria-label="${label}" title="${esc(name)}">${icon("circle-help")}</span>`;
     })
     .join("");
 const hints = () => round.guesses.filter((g) => g.hint).length;
@@ -125,7 +134,7 @@ function refreshIcons() {
   createIcons({ icons, attrs: { "stroke-width": 1.8 } });
 }
 function scoreMarkup(row) {
-  const proximity = proximityFor(row.rank, data.pokemon.length, row.score);
+  const proximity = proximityFor(row.rank, game.pokemon.length, row.score);
   return `<div class="pm-score ${proximity.tone}"><strong>${row.score.toFixed(2)}</strong><small class="pm-proximity">${t(proximity.label)}</small><span class="pm-score-track"><span style="width:${row.score}%"></span></span></div>`;
 }
 function toast(text) {
@@ -172,7 +181,7 @@ function mount() {
         <div class="pm-ranking-footer"><span id="ranking-count" class="pm-ranking-count" role="status"></span><button class="text-button" id="more-ranking" data-action="more-ranking">${icon("chevron-down")}${t("더 보기")}</button></div>
       </section>
       <div class="pm-game-actions"><div><button class="text-button pm-hint" data-action="hint">${icon("lightbulb")}<span id="hint-label">${t("힌트 {count}/{max}", { count: 0, max: MAX_HINTS })}</span></button><button class="text-button" data-action="give-up">${icon("flag")}${t("포기")}</button></div><span id="next-puzzle" class="pm-next"></span></div>
-      <footer class="footer pm-footer"><span>${t("포케맨틀")} <span class="footer-dot">·</span> ${t("비공식 팬 게임")}</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">${t("데이터 · PokéAPI")} ${icon("arrow-right")}</a></footer>
+      <footer class="footer pm-footer"><span>${t("포맨틀")} <span class="footer-dot">·</span> ${t("비공식 팬 게임")}</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">${t("데이터 · PokéAPI")} ${icon("arrow-right")}</a></footer>
     </main>
     <dialog id="pm-dialog"><div class="dialog-header"><h2 id="pm-dialog-title"></h2>${tool("close-dialog", "닫기", "x")}</div><div id="pm-dialog-body"></div></dialog>`;
   on(document.querySelector("#guess-input"), "input", () => {
@@ -265,7 +274,7 @@ function renderSuggestions() {
     closeSuggestions();
     return;
   }
-  matches = searchForms(data.pokemon, query);
+  matches = searchForms(game.pokemon, query);
   const guessed = new Set(round.guesses.map((g) => g.id));
   document.querySelector("#suggestions").hidden = false;
   input.setAttribute("aria-expanded", "true");
@@ -335,7 +344,7 @@ function guess(id, hint = false) {
       ? "정답이에요!"
       : t("{proximity} · 유사도 {score} · {rank}위", {
           proximity: t(
-            proximityFor(row.rank, data.pokemon.length, row.score).label,
+            proximityFor(row.rank, game.pokemon.length, row.score).label,
           ),
           score: row.score.toFixed(2),
           rank: row.rank,
@@ -429,7 +438,7 @@ function renderRankings() {
   }
   const query = document.querySelector("#ranking-search").value.trim();
   const matching = query
-    ? new Set(searchForms(data.pokemon, query).map((p) => p.id))
+    ? new Set(searchForms(game.pokemon, query).map((p) => p.id))
     : null;
   const rows = matching ? ranked.filter((row) => matching.has(row.id)) : ranked;
   const visible = rows.slice(0, rankingLimit);
@@ -526,10 +535,10 @@ async function share() {
   url.search = "";
   url.hash = "";
   url.searchParams.set("date", round.day);
-  const text = `${t("포케맨틀")} ${round.day}\n${isWon(round, target) ? t("{count}번 만에 정답", { count: round.guesses.length }) : t("도전 종료")} · ${t("힌트 {count}회", { count: hints() })}\n${url.href}`;
+  const text = `${t("포맨틀")} ${round.day}\n${isWon(round, target) ? t("{count}번 만에 정답", { count: round.guesses.length }) : t("도전 종료")} · ${t("힌트 {count}회", { count: hints() })}\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
-      await navigator.share({ title: t("포케맨틀"), text });
+      await navigator.share({ title: t("포맨틀"), text });
     else {
       await navigator.clipboard.writeText(text);
       toast("정답을 제외한 결과를 복사했어요.");
@@ -612,8 +621,8 @@ function onClick(event) {
       break;
     case "help":
       dialog(
-        "포케맨틀 규칙",
-        `<ul class="rules"><li>${t("하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 알로라·가라르·히스이·팔데아, 메가진화와 외형 차이도 각각 별개의 정답입니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>`,
+        "포맨틀 규칙",
+        `<ul class="rules"><li>${t("하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 리전 폼·메가진화 등은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>`,
       );
       break;
     case "stats": {
@@ -686,7 +695,7 @@ async function boot() {
     document.querySelector("#retry").onclick = () => location.reload();
   }
 }
-initLanguage("포케맨틀 | 포켓몬 퀴즈", () => {
+initLanguage("포맨틀 | 포켓몬 퀴즈", () => {
   if (!round) return;
   const query = document.querySelector("#guess-input").value;
   const rankingQuery = document.querySelector("#ranking-search").value;

@@ -13,11 +13,7 @@ test("every page shares the same home brand and game logos return to the library
       "./sudoku.html?size=4&level=easy&seed=free:brand",
       "타입도쿠 | 포켓몬 퀴즈",
     ],
-    [
-      "pokemantle",
-      "./pokemantle.html?date=2026-09-10",
-      "포케맨틀 | 포켓몬 퀴즈",
-    ],
+    ["pokemantle", "./pokemantle.html?date=2026-09-10", "포맨틀 | 포켓몬 퀴즈"],
   ]) {
     await page.goto(path);
     const brand = page.getByRole("link", {
@@ -96,7 +92,7 @@ test("game library is responsive, uses a real local preview and does not start S
   const game = page.getByRole("link", { name: "타입도쿠 플레이", exact: true });
   await expect(game).toHaveAttribute("href", "./sudoku.html");
   const pokemantle = page.getByRole("link", {
-    name: "포케맨틀 플레이",
+    name: "포맨틀 플레이",
     exact: true,
   });
   await expect(pokemantle).toHaveAttribute("href", "./pokemantle.html");

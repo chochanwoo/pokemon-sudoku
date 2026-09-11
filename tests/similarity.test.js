@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { isPlayableForm } from "../web/src/form-policy.js";
 import {
   createSimilarity,
   dailyTarget,
@@ -30,7 +31,168 @@ const buffer = binary.buffer.slice(
 );
 const game = createSimilarity(data, buffer);
 
-test("all 1579 forms are distinct, named, searchable and use actual form-specific types", () => {
+test("only explicit commemorative forms are excluded, never whole mythical species", () => {
+  const removed = data.pokemon.filter((p) => !isPlayableForm(p));
+  assert.equal(removed.length, 20);
+  assert.equal(game.pokemon.length, 1559);
+  assert.equal(game.byId.size, 1559);
+  for (const key of [
+    "arceus-unknown",
+    "pichu-spiky-eared",
+    "pikachu-partner-cap",
+    "pikachu-original-cap",
+    "pikachu-world-cap",
+    "pikachu-cosplay",
+    "pikachu-libre",
+    "zarude-dada",
+    "vivillon-poke-ball",
+    "scatterbug-poke-ball",
+    "spewpa-poke-ball",
+  ])
+    assert.ok(
+      removed.some((p) => p.key === key),
+      key,
+    );
+  for (const p of removed) {
+    assert.equal(game.byId.has(p.id), false);
+    for (const query of [p.name, p.key, String(p.id), String(p.speciesId)])
+      assert.ok(searchForms(data.pokemon, query).every(isPlayableForm), query);
+  }
+  const retained = new Set(game.pokemon.map((p) => p.key));
+  for (const key of [
+    "arceus-normal",
+    "arceus-water",
+    "pichu",
+    "pikachu",
+    "pikachu-starter",
+    "eevee-starter",
+    "pikachu-gmax",
+    "charizard-mega-x",
+    "vulpix-alola",
+    "greninja-ash",
+    "greninja-battle-bond",
+    "floette-eternal",
+    "magearna-original",
+    "vivillon-fancy",
+    "ursaluna-bloodmoon",
+    "mew",
+    "celebi",
+    "jirachi",
+    "deoxys-normal",
+    "zarude",
+  ])
+    assert.ok(retained.has(key), key);
+  const mythicalSpecies = new Set(
+    data.pokemon
+      .filter((p) => p.classification === "mythical")
+      .map((p) => p.speciesId),
+  );
+  assert.deepEqual(
+    new Set(
+      game.pokemon
+        .filter((p) => p.classification === "mythical")
+        .map((p) => p.speciesId),
+    ),
+    mythicalSpecies,
+  );
+  assert.equal(isPlayableForm({ key: "new-ambiguous-form" }), true);
+  assert.equal(searchForms(data.pokemon, "Arceus").length, 18);
+});
+
+test("excluded forms cannot be guessed, hinted or ranked, and retained scores keep raw offsets", () => {
+  const removed = data.pokemon.filter((p) => !isPlayableForm(p));
+  const allById = new Map(data.pokemon.map((p) => [p.id, p]));
+  const target = 25;
+  const round = newRound(data, "2026-09-10");
+  const ranked = game.ranking(target);
+  assert.equal(ranked.length, game.pokemon.length);
+  for (const p of removed) {
+    assert.equal(submitGuess(round, p.id, target, game.byId), "unknown");
+    assert.equal(submitGuess(round, p.id, target, allById), "unknown");
+    assert.ok(!ranked.some((r) => r.id === p.id));
+    assert.throws(() => game.ranking(p.id));
+  }
+  const rowIndex = data.pokemon.findIndex((p) => p.id === target);
+  for (const row of ranked) {
+    const colIndex = data.pokemon.findIndex((p) => p.id === row.id);
+    assert.equal(
+      row.score,
+      binary.readUInt16LE((rowIndex * data.pokemon.length + colIndex) * 2) /
+        100,
+    );
+  }
+  for (let i = 0; i < MAX_HINTS; i++) {
+    const id = nextHint(round, ranked);
+    assert.ok(game.byId.has(id));
+    assert.notEqual(id, target);
+    assert.equal(submitGuess(round, id, target, game.byId, true), "ok");
+  }
+});
+
+test("only excluded-answer dates change, to a retained counterpart of the same species", () => {
+  const legacyData = {
+    ...data,
+    pokemon: data.pokemon.map((p) => ({ ...p, key: "" })),
+  };
+  const byId = new Map(data.pokemon.map((p) => [p.id, p]));
+  const origin = Date.parse("2026-01-01T00:00:00Z");
+  let changed = 0;
+  for (let i = 0; i < data.pokemon.length; i++) {
+    const day = new Date(origin + i * 86400000).toISOString().slice(0, 10);
+    const before = dailyTarget(legacyData, day);
+    const after = dailyTarget(data, day);
+    if (isPlayableForm(byId.get(before))) assert.equal(after, before);
+    else {
+      changed++;
+      assert.ok(game.byId.has(after));
+      assert.equal(byId.get(after).speciesId, byId.get(before).speciesId);
+    }
+  }
+  assert.equal(changed, 20);
+  assert.equal(dailyTarget(data, "2026-05-29"), 493);
+});
+
+test("saved rounds remove excluded guesses without losing ordinary progress; replaced answers reset once", () => {
+  const day = "2026-09-10";
+  const legacy = {
+    version: data.version,
+    day,
+    gaveUp: false,
+    guesses: [
+      { id: 25, hint: false },
+      { id: 10057, hint: true },
+      { id: 381, hint: true },
+    ],
+  };
+  const expected = {
+    ...newRound(data, day),
+    guesses: [legacy.guesses[0], legacy.guesses[2]],
+  };
+  assert.deepEqual(restoreRound(JSON.stringify(legacy), data, day), expected);
+  assert.deepEqual(restoreRound(JSON.stringify(expected), data, day), expected);
+  const oldWin = {
+    ...legacy,
+    guesses: [...legacy.guesses, { id: 10316, hint: false }],
+  };
+  assert.ok(isWon(restoreRound(JSON.stringify(oldWin), data, day), 10316));
+  const changedDay = "2026-05-29";
+  for (const guesses of [
+    [],
+    [{ id: 10057, hint: false }],
+    [{ id: 25, hint: false }],
+  ]) {
+    const previous = { ...legacy, day: changedDay, guesses };
+    assert.deepEqual(
+      restoreRound(JSON.stringify(previous), data, changedDay),
+      newRound(data, changedDay),
+    );
+  }
+  const next = newRound(data, changedDay);
+  assert.equal(submitGuess(next, 493, 493, game.byId), "ok");
+  assert.deepEqual(restoreRound(JSON.stringify(next), data, changedDay), next);
+});
+
+test("raw form data stays intact and playable forms retain form-specific types and search", () => {
   assert.equal(data.pokemon.length, 1579);
   assert.equal(new Set(data.pokemon.map((p) => p.name)).size, 1579);
   const byKey = new Map(data.pokemon.map((p) => [p.key, p]));
@@ -107,19 +269,22 @@ test("score updates preserve the v1 daily schedule and saved form guesses", () =
     ],
     gaveUp: false,
   };
-  assert.deepEqual(
-    restoreRound(JSON.stringify(legacy), data, legacy.day),
-    legacy,
-  );
+  assert.deepEqual(restoreRound(JSON.stringify(legacy), data, legacy.day), {
+    ...legacy,
+    target: 10316,
+  });
   assert.deepEqual(
     restoreRound(JSON.stringify({ ...legacy, gaveUp: true }), data, legacy.day),
-    { ...legacy, gaveUp: true },
+    { ...legacy, target: 10316, gaveUp: true },
   );
   const win = {
     ...legacy,
     guesses: [...legacy.guesses, { id: 10316, hint: false }],
   };
-  assert.deepEqual(restoreRound(JSON.stringify(win), data, legacy.day), win);
+  assert.deepEqual(restoreRound(JSON.stringify(win), data, legacy.day), {
+    ...win,
+    target: 10316,
+  });
 });
 
 test("legendary clues lead toward Ultra Necrozma without sacrificing ordinary evolution and regional forms", () => {
@@ -190,16 +355,17 @@ test("proximity labels require both global rank and minimum score, including exa
   assert.equal(proximityFor(21, 200, 25).tone, "cool");
 });
 
-test("daily targets cover every form, remain deterministic and use Korean midnight", () => {
+test("daily targets cover every playable form, remain deterministic and use Korean midnight", () => {
   const found = new Set();
   const origin = Date.parse("2026-01-01T00:00:00Z");
   for (let i = 0; i < data.pokemon.length; i++) {
     const date = new Date(origin + i * 86400000).toISOString().slice(0, 10);
     const id = dailyTarget(data, date);
     found.add(id);
+    assert.ok(game.byId.has(id));
     assert.equal(id, dailyTarget(data, date));
   }
-  assert.equal(found.size, data.pokemon.length);
+  assert.equal(found.size, game.pokemon.length);
   assert.equal(dayKey(new Date("2026-09-10T14:59:59Z")), "2026-09-10");
   assert.equal(dayKey(new Date("2026-09-10T15:00:00Z")), "2026-09-11");
   assert.equal(resolveDay("2026-09-12", "2026-09-10"), "2026-09-10");

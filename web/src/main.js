@@ -98,7 +98,16 @@ const esc = (text) =>
   );
 const difficultyNames = { easy: "쉬움", normal: "보통", hard: "어려움" };
 const app = document.querySelector("#app");
-let catalog, pack, byId, types, puzzle, state;
+let catalog,
+  fullCatalog,
+  legacyCatalog,
+  pack,
+  legacyPack,
+  byId,
+  types,
+  puzzle,
+  state;
+let packVersion = 3;
 let selected = -1,
   mode = "daily",
   size = 6,
@@ -218,7 +227,7 @@ function mount() {
               <label class="legal-toggle"><input id="legal-only" type="checkbox" /><span>${tr("충돌 없는 후보만")}</span></label>
             </div>
             <div id="search-results" hidden>
-              <div class="results-heading"><span id="result-count"></span><span class="small-muted">${tr("기본 폼")}</span></div>
+              <div class="results-heading"><span id="result-count"></span><span class="small-muted" id="form-scope"></span></div>
               <div id="pokemon-results" class="pokemon-results"></div>
             </div>
           </div>
@@ -311,11 +320,39 @@ function mount() {
 
 function start(settings, allowRestore = true) {
   ({ mode, size, difficulty, seed } = settings);
-  puzzle = makePuzzle(pack, catalog, { size, difficulty, seed });
+  packVersion = settings.packVersion === 2 ? 2 : 3;
+  catalog = packVersion === 2 ? legacyCatalog : fullCatalog;
+  byId = new Map(catalog.pokemon.map((p) => [p.id, p]));
+  puzzle = makePuzzle(packVersion === 2 ? legacyPack : pack, catalog, {
+    size,
+    difficulty,
+    seed,
+  });
   state = allowRestore
-    ? restoreState(storage.get(`game:${puzzle.id}`), puzzle, byId) ||
-      newState(puzzle)
-    : newState(puzzle);
+    ? restoreState(storage.get(`game:${puzzle.id}`), puzzle, byId)
+    : null;
+  // Resume pre-form games with their original catalog, clues and legal type pairs.
+  if (!state && allowRestore && settings.packVersion === undefined) {
+    const previous = makePuzzle(legacyPack, legacyCatalog, {
+      size,
+      difficulty,
+      seed,
+    });
+    const previousById = new Map(legacyCatalog.pokemon.map((p) => [p.id, p]));
+    const saved = restoreState(
+      storage.get(`game:${previous.id}`),
+      previous,
+      previousById,
+    );
+    if (saved) {
+      packVersion = 2;
+      catalog = legacyCatalog;
+      byId = previousById;
+      puzzle = previous;
+      state = saved;
+    }
+  }
+  state ||= newState(puzzle);
   selected = -1;
   query = "";
   filters = [];
@@ -328,7 +365,10 @@ function start(settings, allowRestore = true) {
   complete = isComplete(puzzle, state, byId);
   lastTick = performance.now();
   closePicker();
-  storage.set("settings", JSON.stringify({ mode, size, difficulty, seed }));
+  storage.set(
+    "settings",
+    JSON.stringify({ mode, size, difficulty, seed, packVersion }),
+  );
   render();
 }
 
@@ -502,11 +542,20 @@ function renderPicker() {
           ? "주어진 포켓몬"
           : "포켓몬 선택",
   );
-  document.querySelector("#picker-count").textContent = tr("{count}종", {
-    count: catalog.pokemon.length,
-  });
+  document.querySelector("#picker-count").textContent = tr(
+    packVersion === 2 ? "{count}종" : "{count}개 모습",
+    {
+      count: catalog.pokemon.length,
+    },
+  );
+  document.querySelector("#form-scope").textContent = tr(
+    packVersion === 2 ? "기본 폼" : "기본·메가·리전 폼",
+  );
+  document
+    .querySelector("#pokemon-results")
+    .classList.toggle("with-forms", packVersion !== 2);
   document.querySelector("#selected-preview").innerHTML = p
-    ? `${sprite(p)}<div><span class="dex-number">No. ${String(p.id).padStart(4, "0")}</span><strong>${esc(pokemonName(p))}</strong><div>${p.types.map(badge).join("")}</div></div>${puzzle.givens[selected] ? `<span class="given-label">${icon("lock-keyhole")}${tr("고정")}</span>` : ""}`
+    ? `${sprite(p)}<div><span class="dex-number">No. ${String(p.speciesId || p.id).padStart(4, "0")}</span><strong>${esc(pokemonName(p))}</strong><div>${p.types.map(badge).join("")}</div></div>${puzzle.givens[selected] ? `<span class="given-label">${icon("lock-keyhole")}${tr("고정")}</span>` : ""}`
     : `<span class="preview-icon">${icon(pencil ? "pencil" : "grid-2-x2")}</span><div><strong>${selected < 0 ? tr("아직 선택한 칸이 없어요") : cellLabel(selected)}</strong><span class="small-muted">${tr(selected < 0 ? "빈 칸" : pencil ? "메모 중" : "선택한 빈 칸")}</span></div>`;
   document.querySelector("#pokemon-picker").hidden = pencil;
   document.querySelector("#note-picker").hidden = !editable || !!p;
@@ -603,7 +652,7 @@ function renderResults() {
         .map((p) => {
           const used = isPokemonUsed(state.entries, selected, p.id);
           return `<button class="pokemon-choice ${state.entries[selected] === p.id ? "chosen" : ""} ${used ? "used" : ""}" data-pokemon="${p.id}" aria-label="${esc(pokemonName(p))}, ${p.types.map((t) => typeName(types.get(t))).join(" ")}${used ? tr(", 이미 사용 중") : ""}" ${!editable || used ? 'aria-disabled="true"' : ""}>
-    ${sprite(p, "", true)}<span class="choice-name">${esc(pokemonName(p))}</span><span class="choice-types">${p.types.map(badge).join("")}</span><span class="choice-number">#${String(p.id).padStart(3, "0")}</span>${used ? `<span class="choice-used">${tr("사용 중")}</span>` : ""}
+    ${sprite(p, "", true)}<span class="choice-name">${esc(pokemonName(p))}</span><span class="choice-types">${p.types.map(badge).join("")}</span><span class="choice-number">#${String(p.speciesId || p.id).padStart(3, "0")}</span>${used ? `<span class="choice-used">${tr("사용 중")}</span>` : ""}
   </button>`;
         })
         .join("")
@@ -848,7 +897,7 @@ function handleClick(e) {
       break;
     case "confirm-restart":
       document.querySelector("#dialog").close();
-      start({ mode, size, difficulty, seed }, false);
+      start({ mode, size, difficulty, seed, packVersion }, false);
       save();
       break;
     case "share":
@@ -1020,7 +1069,7 @@ function showHelp() {
     `<div class="rule-example">${sprite(byId.get(1))}<div><strong>${esc(pokemonName(byId.get(1)))}</strong><div>${[12, 4].map(badge).join("")}</div></div></div>
     <ol class="rules"><li>${tr("빈 칸마다 <strong>두 타입을 가진 포켓몬</strong>을 놓습니다.")}</li><li>${tr("같은 가로줄, 세로줄, 굵은 선으로 나눈 구역 안에서는 <strong>어떤 타입도 두 번 나올 수 없습니다.</strong>")}</li><li>${tr("<strong>같은 포켓몬은 보드 전체에서 한 번만</strong> 사용할 수 있습니다. 주어진 포켓몬도 포함합니다.")}</li><li>${tr("각 줄과 구역에 이번 퍼즐의 {count}개 타입이 한 번씩 들어가면 완성입니다.", { count: puzzle.types.length })}</li><li>${tr("주어진 포켓몬은 바꿀 수 없습니다. 같은 타입 조합이라도 서로 다른 포켓몬이면 사용할 수 있습니다.")}</li></ol>
     <p class="dialog-copy">${tr("오늘의 퍼즐은 한국 시간 자정에 바뀝니다. 크기와 난이도가 같으면 모두 같은 문제를 받습니다.")}</p>
-    <p class="dialog-copy">${tr("포켓몬 기본 폼 526종을 사용합니다. 지역 폼과 메가진화는 포함하지 않습니다.")}</p>`,
+    <p class="dialog-copy">${packVersion === 2 ? tr("포켓몬 기본 폼 526종을 사용합니다. 지역 폼과 메가진화는 포함하지 않습니다.") : tr("기본 폼과 메가진화·지역 폼 중 두 타입을 가진 {count}개 모습을 사용합니다. 서로 다른 모습은 별개의 포켓몬으로 취급합니다.", { count: catalog.pokemon.length })}</p>`,
   );
 }
 
@@ -1060,6 +1109,7 @@ async function share() {
   url.searchParams.set("size", String(size));
   url.searchParams.set("level", difficulty);
   url.searchParams.set("seed", seed);
+  url.searchParams.set("v", String(packVersion));
   const text = `${tr("타입도쿠")} ${mode === "daily" ? seed.replace("daily:", "") : tr("자유 퍼즐")}\n${size}×${size} · ${tr(difficultyNames[difficulty])}\n${formatTime(state.elapsedMs)} · ${tr("힌트 {count}회", { count: state.hints })}\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
@@ -1090,15 +1140,19 @@ function toast(message) {
 async function boot() {
   app.innerHTML = `<div class="loading-screen"><span class="loading-spinner"></span><strong>${tr("퍼즐을 준비하고 있어요")}</strong></div>`;
   try {
-    [catalog, pack] = await Promise.all(
-      ["catalog.json", "puzzles.json"].map(async (path) => {
+    [fullCatalog, pack, legacyPack] = await Promise.all(
+      ["catalog.json", "puzzles.json", "puzzles-v2.json"].map(async (path) => {
         const response = await fetch(asset(path), { cache: "no-cache" });
         if (!response.ok) throw new Error(`Data: ${response.status}`);
         return response.json();
       }),
     );
-    byId = new Map(catalog.pokemon.map((p) => [p.id, p]));
-    types = new Map(catalog.types.map((t) => [t.id, t]));
+    legacyCatalog = {
+      ...fullCatalog,
+      version: 1,
+      pokemon: fullCatalog.pokemon.filter((p) => !p.isAlternate),
+    };
+    types = new Map(fullCatalog.types.map((t) => [t.id, t]));
     let settings = {
       mode: "daily",
       size: 6,
@@ -1116,7 +1170,11 @@ async function boot() {
       )
         settings = saved;
     } catch {}
-    if (settings.mode === "daily") settings.seed = `daily:${dayKey()}`;
+    if (settings.mode === "daily") {
+      const today = `daily:${dayKey()}`;
+      if (settings.seed !== today) delete settings.packVersion;
+      settings.seed = today;
+    }
     const params = new URLSearchParams(location.search),
       sharedSeed = params.get("seed");
     if (
@@ -1126,6 +1184,11 @@ async function boot() {
       settings = {
         mode: sharedSeed.startsWith("daily:") ? "daily" : "free",
         seed: sharedSeed,
+        packVersion: params.has("v")
+          ? params.get("v") === "2"
+            ? 2
+            : 3
+          : undefined,
         size: [4, 6, 9].includes(Number(params.get("size")))
           ? Number(params.get("size"))
           : 6,

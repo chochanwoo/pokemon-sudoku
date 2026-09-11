@@ -30,7 +30,28 @@ def export_catalog():
             entry["types"] = [t[0] for t in db.execute("SELECT type_id FROM pokemon_types WHERE pokemon_id=? ORDER BY type_id", (r["id"],))]
             if len(entry["types"]) == 2 and entry["url"]:
                 pokemon.append(entry)
-    return types, pokemon
+    return types, include_special_forms(pokemon, json.loads((PUBLIC / "pokemantle.json").read_text(encoding="utf-8")))
+
+
+def include_special_forms(pokemon, source):
+    result = list(pokemon)
+    seen = {p["id"] for p in result}
+    valid_types = set(range(1, 19))
+    for form in source["pokemon"]:
+        if not set(form["key"].split("-")) & {"mega", "alola", "galar", "hisui", "paldea"}:
+            continue
+        if len(set(form["types"])) != 2 or not set(form["types"]) <= valid_types:
+            continue
+        if form["id"] in seen:
+            raise ValueError(f"Duplicate Pokemon ID: {form['id']}")
+        image = source["images"].get(form.get("image"))
+        if not image:
+            raise ValueError(f"Missing special-form sprite: {form['key']}")
+        entry = {key: form[key] for key in ["id", "speciesId", "key", "name", "english", "baseName", "form", "aliases", "types"]}
+        entry.update(isAlternate=True, image=image)
+        result.append(entry)
+        seen.add(form["id"])
+    return result
 
 
 def units(n, bh, bw):
@@ -133,11 +154,13 @@ def make_puzzle(n, bh, bw, pairs, capacities, seed):
                 clues[i] = pair
                 rejected.add(i)
         masks[difficulty] = sorted(clues)
-    return {"id": f"v2-{n}-{seed}", "uniquePokemon": True, "size": n, "boxRows": bh, "boxCols": bw,
+    return {"id": f"v3-{n}-{seed}", "uniquePokemon": True, "size": n, "boxRows": bh, "boxCols": bw,
             "types": selected, "solution": solution, "givens": masks}
 
 
 def download_sprite(p):
+    if p.get("image"):
+        return
     destination = PUBLIC / "sprites" / f"{p['id']}.png"
     if destination.exists():
         return
@@ -193,7 +216,7 @@ def main():
                     raise RuntimeError(f"Uniqueness verification failed: {puzzle['id']} {difficulty}")
         print(f"Verified duplicate-free unique solutions for all {len(puzzles)*3} puzzle/difficulty combinations", flush=True)
         return
-    catalog = {"version": 1, "types": types, "pokemon": [{k:v for k,v in p.items() if k != "url"} for p in pokemon]}
+    catalog = {"version": 2, "types": types, "pokemon": [{k:v for k,v in p.items() if k != "url"} for p in pokemon]}
     if not args.puzzles_only:
         (PUBLIC / "catalog.json").write_text(json.dumps(catalog, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     if not args.puzzles_only:

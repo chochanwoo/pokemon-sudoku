@@ -13,6 +13,7 @@ import {
 } from "../web/src/i18n.js";
 import { searchForms, dailyTarget } from "../web/src/similarity-engine.js";
 import { searchPokemon } from "../web/src/engine.js";
+import { isPlayableForm } from "../web/src/form-policy.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const data = JSON.parse(read("../web/public/pokemantle.json"));
@@ -57,15 +58,16 @@ test("translations preserve placeholders and cover literal UI message keys", () 
   }
 });
 
-test("every form has a distinct English name and remains searchable by that name", () => {
+test("every form has a distinct English name and only playable forms are searchable", () => {
   const names = new Set();
   for (const p of data.pokemon) {
     const name = englishName(p);
     assert.ok(name && !/[가-힣]/.test(name), p.key);
     assert.ok(!names.has(name), `${p.key}: ${name}`);
     names.add(name);
-    assert.ok(
+    assert.equal(
       searchForms(data.pokemon, name).some((result) => result.id === p.id),
+      isPlayableForm(p),
       name,
     );
   }
