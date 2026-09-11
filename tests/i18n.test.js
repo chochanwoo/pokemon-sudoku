@@ -47,7 +47,13 @@ test("translations preserve placeholders and cover literal UI message keys", () 
     assert.ok(translated && !/[가-힣]/.test(translated), source);
     assert.deepEqual(params(translated), params(source), source);
   }
-  for (const file of ["main.js", "home.js", "pokemantle.js", "site-brand.js"]) {
+  for (const file of [
+    "main.js",
+    "home.js",
+    "pokemantle.js",
+    "pokeclue.js",
+    "site-brand.js",
+  ]) {
     const source = read(`../web/src/${file}`);
     for (const [, key] of source.matchAll(
       /\b(?:t|tr|initLanguage)\("([^"\n]+)"/g,

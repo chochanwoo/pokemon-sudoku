@@ -228,4 +228,56 @@ export default {
   "아직 완료한 도전이 없어요.": "No finished rounds yet.",
   "다음 문제 {time}": "Next puzzle {time}",
   "오늘의 포켓몬을 준비하고 있어요": "Loading today's Pokemon",
+  포케클루: "PokeClue",
+  "포케클루 | 포켓몬 퀴즈": "PokeClue | Pokemon Quiz",
+  "단서 추리": "Attribute clues",
+  "데일리 · 연습": "Daily · Practice",
+  "타입과 특성 등 여섯 가지 단서를 비교한 포케클루 추측 기록":
+    "PokeClue guesses comparing six clues including types and abilities",
+  타입: "Types",
+  특성: "Abilities",
+  "알 그룹": "Egg groups",
+  진화: "Evolution",
+  세대: "Generation",
+  "종족값 합계": "Base stat total",
+  일치: "Match",
+  "일부 일치": "Partial",
+  불일치: "No match",
+  미확인: "Unknown",
+  연습: "Practice",
+  "연습 도전": "Practice round",
+  "남은 기회": "Guesses left",
+  "일치한 단서": "Matching clues",
+  "새 연습": "New practice",
+  "이미 같은 단서의 모습을 추측했어요.":
+    "You already guessed a form with the same clues.",
+  "기회를 모두 사용했어요.": "No guesses left.",
+  "{count}개 단서 일치 · {remaining}번 남았어요":
+    "{count} clues match · {remaining} guesses left",
+  "숨겨진 특성": "Hidden ability",
+  "{stage}단계": "Stage {stage}",
+  "{generation}세대": "Gen {generation}",
+  "정답의 값이 더 높아요": "The answer's value is higher",
+  "정답의 값이 더 낮아요": "The answer's value is lower",
+  "같은 계열": "Same family",
+  "다른 계열": "Other family",
+  "새 연습을 시작할까요?": "Start a new practice round?",
+  "새로운 포켓몬으로 연습을 시작합니다.":
+    "A new Pokemon will be selected for practice.",
+  "일치 O · 일부 ~ · 불일치 X": "Match O · Partial ~ · No match X",
+  "포케클루 규칙": "PokeClue rules",
+  "포켓몬을 최대 8번 추측합니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.":
+    "Guess the Pokemon in up to 8 attempts. Types, abilities and egg groups match when their full sets agree, regardless of order. Shared entries count as partial matches.",
+  "화살표는 정답을 가리킵니다. 위 화살표는 정답의 값이 더 높고, 아래 화살표는 더 낮다는 뜻입니다.":
+    "Arrows point toward the answer: up means its value is higher; down means it is lower.",
+  "진화는 단계와 계열을 함께 비교합니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 종이 처음 등장한 세대입니다.":
+    "Evolution compares both stage and family. Stages start at 1, including baby Pokemon; Mega Evolution does not add a stage. Generation refers to the species' debut.",
+  "특성은 숨겨진 특성을 포함합니다. 미확인 자료는 판정하지 않습니다. 특성 자료가 없거나 다른 종과 모든 단서가 같아 구별할 수 없는 포켓몬은 정답으로 출제하지 않습니다.":
+    "Abilities include hidden abilities. Missing data is not scored. Pokemon with missing ability data, or identical clues to a different species, are not selected as answers.",
+  "메가·리전 폼도 포함합니다. 같은 종에서 모든 단서가 같은 외형 차이는 같은 정답으로 인정하며, 일부 이벤트·기념용 모습은 제외합니다.":
+    "Mega and regional forms are included. Forms of the same species with identical clues count as the same answer. Selected event and commemorative forms are excluded.",
+  "데일리는 한국 시간 자정에 바뀝니다. 연습은 데일리 기록과 별개이며, 진행 상황은 이 브라우저에 저장됩니다.":
+    "The daily puzzle changes at midnight in Korea (UTC+9). Practice is separate from daily records. Progress is saved in this browser.",
+  "데일리 기록": "Daily records",
+  "오늘의 단서를 준비하고 있어요": "Loading today's clues",
 };

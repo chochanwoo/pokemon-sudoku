@@ -18,6 +18,9 @@ export default defineConfig({
         pokemantle: fileURLToPath(
           new URL("./web/pokemantle.html", import.meta.url),
         ),
+        pokeclue: fileURLToPath(
+          new URL("./web/pokeclue.html", import.meta.url),
+        ),
       },
     },
   },
@@ -47,6 +50,7 @@ export default defineConfig({
           "puzzles-v2.json",
           "pokemantle.json",
           "pokemantle-scores.bin",
+          "pokeclue.json",
           "NOTICE.txt",
           ".nojekyll",
         ]) {
