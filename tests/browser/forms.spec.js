@@ -46,7 +46,7 @@ test("Arceus has only 18 real types in search and revealed rankings in both lang
   await expect(page.locator("#attempts")).toHaveText("1");
   await page.getByRole("button", { name: "포기", exact: true }).click();
   await page.getByRole("button", { name: "정답 공개", exact: true }).click();
-  await expect(page.locator("#ranking-total")).toHaveText("1,559개 모습");
+  await expect(page.locator("#ranking-total")).toHaveText("1,351개 모습");
   await page.locator("#ranking-search").fill("아르세우스");
   await expect(page.locator("#similarity-ranking tr")).toHaveCount(18);
   await expect(
@@ -149,7 +149,6 @@ test("special forms stay hidden while base mythicals and ambiguous forms remain 
       "mew",
       "celebi",
       "jirachi",
-      "magearna-original",
       "greninja-ash",
       "floette-eternal",
     ]) {
@@ -159,6 +158,8 @@ test("special forms stay hidden while base mythicals and ambiguous forms remain 
         page.locator(`#guess-options [data-guess="${p.id}"]`),
       ).toBeVisible();
     }
+    await input.fill("magearna-original");
+    await expect(page.locator('#guess-options [data-guess="801"]')).toBeVisible();
   }
   await input.fill("Pikachu");
   await page.screenshot({

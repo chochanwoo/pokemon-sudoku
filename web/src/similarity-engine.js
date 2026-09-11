@@ -1,9 +1,12 @@
 import { dayKey, initials } from "./engine.js";
 import { englishName } from "./pokemon-names.js";
 import { isPlayableForm } from "./form-policy.js";
+import { pokemantleForms } from "./pokemantle-forms.js";
 
 export { dayKey };
 export const MAX_HINTS = 3;
+// Keep released puzzles stable, then give every merged entry one slot per cycle.
+const MERGED_FORMS_START_DAY = "2026-09-13";
 
 export function proximityFor(rank, total, score) {
   if (rank === 1) return { tone: "hot", label: "정답" };
@@ -31,7 +34,11 @@ function scheduledTarget(data, day) {
   let seed = 2166136261;
   for (const char of data.version)
     seed = Math.imul(seed ^ char.charCodeAt(0), 16777619) >>> 0;
-  const ids = data.pokemon.map((p) => p.id).sort((a, b) => a - b);
+  const pool =
+    day < MERGED_FORMS_START_DAY
+      ? data.pokemon
+      : pokemantleForms(data.pokemon).pokemon;
+  const ids = pool.map((p) => p.id).sort((a, b) => a - b);
   if (!ids.length) throw new Error("No Pokemon forms");
   for (let i = ids.length - 1; i > 0; i--) {
     seed ^= seed << 13;
@@ -47,14 +54,15 @@ function scheduledTarget(data, day) {
 export function dailyTarget(data, day) {
   const id = scheduledTarget(data, day);
   const scheduled = data.pokemon.find((p) => p.id === id);
-  if (isPlayableForm(scheduled)) return scheduled.id;
+  const { canonicalIdById } = pokemantleForms(data.pokemon);
+  if (isPlayableForm(scheduled)) return canonicalIdById.get(id);
   // Keep ordinary dates stable and replace removed answers with a base counterpart.
   const counterpart = data.pokemon
     .filter((p) => p.speciesId === scheduled.speciesId && isPlayableForm(p))
     .sort((a, b) => a.id - b.id)[0];
   if (!counterpart)
     throw new Error("Excluded form has no playable counterpart");
-  return counterpart.id;
+  return canonicalIdById.get(counterpart.id);
 }
 
 export function createSimilarity(data, buffer) {
@@ -63,17 +71,21 @@ export function createSimilarity(data, buffer) {
     throw new Error("Invalid similarity matrix");
   const index = new Map(data.pokemon.map((p, i) => [p.id, i]));
   if (index.size !== count) throw new Error("Duplicate form IDs");
-  // Matrix offsets retain the raw catalog order; only gameplay uses the filtered pool.
-  const pokemon = data.pokemon.filter(isPlayableForm);
+  // Matrix offsets retain the raw catalog order; legacy dates also use raw IDs.
+  // Only Pokemantle gameplay uses the merged pool and representative scores.
+  const { pokemon, canonicalIdById } = pokemantleForms(data.pokemon);
   const byId = new Map(pokemon.map((p) => [p.id, p]));
   const matrix = new DataView(buffer);
   const score = (a, b) => {
     if (!index.has(a) || !index.has(b)) throw new Error("Unknown Pokemon form");
+    a = canonicalIdById.get(a) ?? a;
+    b = canonicalIdById.get(b) ?? b;
     return (
       matrix.getUint16((index.get(a) * count + index.get(b)) * 2, true) / 100
     );
   };
   const ranking = (target) => {
+    target = canonicalIdById.get(target) ?? target;
     if (!byId.has(target)) throw new Error("Unknown playable Pokemon form");
     const rows = pokemon
       .map((p) => ({ id: p.id, score: score(target, p.id) }))
@@ -107,11 +119,13 @@ export function restoreRound(raw, data, day) {
     const value = JSON.parse(raw);
     const ids = new Set(data.pokemon.map((p) => p.id));
     const target = dailyTarget(data, day);
+    const { canonicalIdById } = pokemantleForms(data.pokemon);
+    const savedTarget = value?.target ?? scheduledTarget(data, day);
     if (
       !value ||
       value.version !== data.version ||
       value.day !== day ||
-      (value.target ?? scheduledTarget(data, day)) !== target ||
+      canonicalIdById.get(savedTarget) !== target ||
       typeof value.gaveUp !== "boolean" ||
       !Array.isArray(value.guesses) ||
       value.guesses.length > ids.size ||
@@ -122,22 +136,29 @@ export function restoreRound(raw, data, day) {
       value.guesses.filter((g) => g.hint).length > MAX_HINTS
     )
       return fallback();
-    const playableIds = new Set(
-      data.pokemon.filter(isPlayableForm).map((p) => p.id),
-    );
-    const guesses = value.guesses.filter((g) => playableIds.has(g.id));
-    const targetIndex = guesses.findIndex((g) => g.id === target);
+    const savedTargetIndex = value.guesses.findIndex((g) => g.id === savedTarget);
     if (
-      targetIndex >= 0 &&
-      (targetIndex !== guesses.length - 1 || value.gaveUp)
+      savedTargetIndex >= 0 &&
+      (savedTargetIndex !== value.guesses.length - 1 || value.gaveUp)
     )
       return fallback();
+    const guesses = [],
+      seen = new Set();
+    for (const guess of value.guesses) {
+      const id = canonicalIdById.get(guess.id);
+      if (id === undefined || seen.has(id)) continue;
+      seen.add(id);
+      guesses.push({ id, hint: guess.hint });
+      // A formerly wrong cosmetic variant now solves the puzzle. Preserve
+      // progress up to that first correct guess, even after a later give-up.
+      if (id === target) break;
+    }
     return {
       version: value.version,
       day,
       target,
       guesses,
-      gaveUp: value.gaveUp,
+      gaveUp: !seen.has(target) && value.gaveUp,
     };
   } catch {
     return fallback();

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { isPlayableForm } from "../web/src/form-policy.js";
+import { pokemantleForms } from "../web/src/pokemantle-forms.js";
+import { englishName } from "../web/src/pokemon-names.js";
 import {
   createSimilarity,
   dailyTarget,
@@ -31,11 +33,157 @@ const buffer = binary.buffer.slice(
 );
 const game = createSimilarity(data, buffer);
 
+test("cosmetic variations share one named, searchable Pokemantle entry without changing raw data", () => {
+  const before = JSON.stringify(data.pokemon);
+  const { pokemon, canonicalIdById } = pokemantleForms(data.pokemon);
+  for (const [speciesId, name, english, count] of [
+    [201, "안농", "Unown", 1],
+    [412, "도롱충이", "Burmy", 1],
+    [414, "나메일", "Mothim", 1],
+    [422, "깝질무", "Shellos", 1],
+    [423, "트리토돈", "Gastrodon", 1],
+    [585, "사철록", "Deerling", 1],
+    [586, "바라철록", "Sawsbuck", 1],
+    [592, "탱그릴", "Frillish", 1],
+    [593, "탱탱겔", "Jellicent", 1],
+    [664, "분이벌레", "Scatterbug", 1],
+    [665, "분떠도리", "Spewpa", 1],
+    [666, "비비용", "Vivillon", 1],
+    [668, "화염레오", "Pyroar", 2],
+    [669, "플라베베", "Flabébé", 1],
+    [670, "플라엣테", "Floette", 3],
+    [671, "플라제스", "Florges", 1],
+    [676, "트리미앙", "Furfrou", 1],
+    [716, "제르네아스", "Xerneas", 1],
+    [801, "마기아나", "Magearna", 2],
+    [854, "데인차", "Sinistea", 1],
+    [855, "포트데스", "Polteageist", 1],
+    [869, "마휘핑", "Alcremie", 2],
+    [925, "파밀리쥐", "Maushold", 1],
+    [982, "노고고치", "Dudunsparce", 1],
+    [1007, "코라이돈", "Koraidon", 1],
+    [1008, "미라이돈", "Miraidon", 1],
+    [1012, "차데스", "Poltchageist", 1],
+    [1013, "그우린차", "Sinistcha", 1],
+  ]) {
+    const base = game.byId.get(speciesId);
+    assert.equal(base.name, name);
+    assert.equal(englishName(base), english);
+    assert.equal(pokemon.filter((p) => p.speciesId === speciesId).length, count);
+    for (const p of data.pokemon.filter((p) => p.pokemonId === speciesId && isPlayableForm(p))) {
+      for (const query of [p.name, p.key, englishName(p), String(p.id)]) {
+        assert.ok(searchForms(pokemon, query).some((r) => r.id === canonicalIdById.get(p.id)), query);
+        assert.ok(!searchForms(pokemon, query).some((r) => r.speciesId === speciesId && r.id !== base.id && r.pokemonId === speciesId));
+      }
+    }
+  }
+  assert.equal(searchForms(pokemon, "분떠도리").length, 1);
+  assert.equal(searchForms(pokemon, "ㅂㄸㄷㄹ")[0].id, 665);
+  assert.equal(searchForms(data.pokemon, "분떠도리").length, 19);
+  assert.equal(JSON.stringify(data.pokemon), before);
+});
+
+test("cosmetic colors merge within battle forms and equivalent guesses use the same score and rank", () => {
+  const p = (key) => data.pokemon.find((p) => p.key === key);
+  const { canonicalIdById } = pokemantleForms(data.pokemon);
+  const minior = game.pokemon.filter((p) => p.speciesId === 774);
+  assert.deepEqual(minior.map((p) => p.name), ["메테노 (유성의 모습)", "메테노 (코어의 모습)"]);
+  assert.deepEqual(minior.map(englishName), ["Minior (Meteor Form)", "Minior (Core Form)"]);
+  for (const keys of [
+    ["minior-red-meteor", "minior-blue-meteor"],
+    ["minior-red", "minior-blue"],
+    ["spewpa-icy-snow", "spewpa-meadow"],
+    ["maushold-family-of-four", "maushold-family-of-three"],
+    ["magearna-mega", "magearna-original-mega"],
+  ]) {
+    const [a, b] = keys.map(p);
+    assert.equal(canonicalIdById.get(a.id), canonicalIdById.get(b.id));
+    assert.equal(game.score(a.id, b.id), 100);
+    assert.equal(game.score(25, a.id), game.score(25, b.id));
+    assert.deepEqual(game.ranking(a.id), game.ranking(b.id));
+  }
+  for (const [a, b] of [
+    ["minior-red-meteor", "minior-red"],
+    ["alcremie-vanilla-cream-strawberry-sweet", "alcremie-gmax"],
+    ["floette-red", "floette-eternal"],
+    ["wormadam-plant", "wormadam-sandy"],
+    ["meowstic-male", "meowstic-female"],
+    ["arceus-normal", "arceus-water"],
+    ["silvally-normal", "silvally-water"],
+    ["genesect", "genesect-burn"],
+    ["cherrim-overcast", "cherrim-sunshine"],
+    ["tatsugiri-curly", "tatsugiri-droopy"],
+    ["squawkabilly-green-plumage", "squawkabilly-yellow-plumage"],
+  ]) {
+    assert.notEqual(canonicalIdById.get(p(a).id), canonicalIdById.get(p(b).id));
+    assert.ok(game.score(p(a).id, p(b).id) < 100);
+  }
+  const round = newRound(data, "2026-09-10");
+  for (const [query, result] of [["spewpa meadow", "ok"], ["spewpa polar", "duplicate"]]) {
+    const [choice] = searchForms(game.pokemon, query);
+    assert.equal(submitGuess(round, choice.id, round.target, game.byId), result);
+  }
+  const ranked = game.ranking(665);
+  assert.equal(ranked.filter((r) => game.byId.get(r.id).speciesId === 665).length, 1);
+  for (let i = 0; i < MAX_HINTS; i++) {
+    const hint = nextHint(round, game.ranking(round.target));
+    if (hint === null) break;
+    assert.notEqual(game.byId.get(hint).speciesId, 665);
+    assert.equal(submitGuess(round, hint, round.target, game.byId, true), "ok");
+  }
+});
+
+test("old cosmetic guesses migrate, deduplicate and credit the first correct form, including give-ups", () => {
+  const id = (key) => data.pokemon.find((p) => p.key === key).id;
+  const day = "2026-09-12";
+  const meadow = id("spewpa-meadow");
+  const polar = id("spewpa-polar");
+  const legacy = {
+    version: data.version, day, target: meadow, gaveUp: false,
+    guesses: [{ id: 25, hint: false }, { id: polar, hint: false }, { id: 381, hint: true }],
+  };
+  const expected = {
+    ...newRound(data, day),
+    guesses: [{ id: 25, hint: false }, { id: 665, hint: false }],
+  };
+  for (const previous of [
+    legacy,
+    { ...legacy, target: undefined },
+    { ...legacy, gaveUp: true },
+    { ...legacy, guesses: [...legacy.guesses, { id: meadow, hint: false }] },
+    { ...legacy, guesses: [{ id: 25, hint: false }, { id: 665, hint: false }] },
+  ]) {
+    const restored = restoreRound(JSON.stringify(previous), data, day);
+    assert.deepEqual(restored, expected);
+    assert.equal(isWon(restored, 665), true);
+    assert.deepEqual(restoreRound(JSON.stringify(restored), data, day), expected);
+  }
+  const unfinished = { ...legacy, guesses: [{ id: 25, hint: false }] };
+  assert.deepEqual(restoreRound(JSON.stringify(unfinished), data, day), { ...unfinished, target: 665 });
+
+  const otherDay = "2026-09-10";
+  const duplicates = {
+    ...newRound(data, otherDay),
+    guesses: [
+      { id: polar, hint: true }, { id: meadow, hint: false },
+      { id: 25, hint: false }, { id: 381, hint: true },
+    ],
+  };
+  assert.deepEqual(restoreRound(JSON.stringify(duplicates), data, otherDay).guesses, [
+    { id: 665, hint: true }, ...duplicates.guesses.slice(2),
+  ]);
+  for (const corrupt of [
+    { ...expected, guesses: [...expected.guesses, { id: 381, hint: false }] },
+    { ...expected, gaveUp: true },
+    { ...expected, target: 25 },
+  ]) assert.deepEqual(restoreRound(JSON.stringify(corrupt), data, day), newRound(data, day));
+});
+
 test("only explicit commemorative forms are excluded, never whole mythical species", () => {
   const removed = data.pokemon.filter((p) => !isPlayableForm(p));
   assert.equal(removed.length, 20);
-  assert.equal(game.pokemon.length, 1559);
-  assert.equal(game.byId.size, 1559);
+  assert.equal(game.pokemon.length, 1351);
+  assert.equal(game.byId.size, 1351);
   for (const key of [
     "arceus-unknown",
     "pichu-spiky-eared",
@@ -72,8 +220,8 @@ test("only explicit commemorative forms are excluded, never whole mythical speci
     "greninja-ash",
     "greninja-battle-bond",
     "floette-eternal",
-    "magearna-original",
-    "vivillon-fancy",
+    "magearna",
+    "vivillon-meadow",
     "ursaluna-bloodmoon",
     "mew",
     "celebi",
@@ -129,26 +277,26 @@ test("excluded forms cannot be guessed, hinted or ranked, and retained scores ke
   }
 });
 
-test("only excluded-answer dates change, to a retained counterpart of the same species", () => {
+test("legacy dates only replace excluded or cosmetic forms within the same species", () => {
   const legacyData = {
     ...data,
-    pokemon: data.pokemon.map((p) => ({ ...p, key: "" })),
+    pokemon: data.pokemon.map((p) => ({ ...p, key: "", pokemonId: undefined })),
   };
   const byId = new Map(data.pokemon.map((p) => [p.id, p]));
-  const origin = Date.parse("2026-01-01T00:00:00Z");
+  const origin = Date.parse("2026-09-12T00:00:00Z") - (data.pokemon.length - 1) * 86400000;
   let changed = 0;
   for (let i = 0; i < data.pokemon.length; i++) {
     const day = new Date(origin + i * 86400000).toISOString().slice(0, 10);
     const before = dailyTarget(legacyData, day);
     const after = dailyTarget(data, day);
-    if (isPlayableForm(byId.get(before))) assert.equal(after, before);
+    if (game.byId.has(before)) assert.equal(after, before);
     else {
       changed++;
       assert.ok(game.byId.has(after));
       assert.equal(byId.get(after).speciesId, byId.get(before).speciesId);
     }
   }
-  assert.equal(changed, 20);
+  assert.equal(changed, data.pokemon.length - game.pokemon.length);
   assert.equal(dailyTarget(data, "2026-05-29"), 493);
 });
 
@@ -355,17 +503,19 @@ test("proximity labels require both global rank and minimum score, including exa
   assert.equal(proximityFor(21, 200, 25).tone, "cool");
 });
 
-test("daily targets cover every playable form, remain deterministic and use Korean midnight", () => {
+test("future daily targets cover each merged entry once per cycle and use Korean midnight", () => {
   const found = new Set();
-  const origin = Date.parse("2026-01-01T00:00:00Z");
-  for (let i = 0; i < data.pokemon.length; i++) {
+  const origin = Date.parse("2026-09-13T00:00:00Z");
+  for (let i = 0; i < game.pokemon.length; i++) {
     const date = new Date(origin + i * 86400000).toISOString().slice(0, 10);
     const id = dailyTarget(data, date);
+    assert.ok(!found.has(id));
     found.add(id);
     assert.ok(game.byId.has(id));
     assert.equal(id, dailyTarget(data, date));
   }
   assert.equal(found.size, game.pokemon.length);
+  assert.equal(dailyTarget(data, "2026-09-12"), 665);
   assert.equal(dayKey(new Date("2026-09-10T14:59:59Z")), "2026-09-10");
   assert.equal(dayKey(new Date("2026-09-10T15:00:00Z")), "2026-09-11");
   assert.equal(resolveDay("2026-09-12", "2026-09-10"), "2026-09-10");

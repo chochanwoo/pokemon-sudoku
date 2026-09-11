@@ -224,8 +224,8 @@ export default {
   "이 문제의 도전이 종료됩니다.": "This will end the current round.",
   "정답 공개": "Reveal answer",
   "포맨틀 규칙": "Pokemantle rules",
-  "하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 리전 폼·메가진화 등은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.":
-    "Guess the <strong>exact Pokemon form</strong> each day. Regional, Mega and other forms are separate answers, except for selected event and commemorative variants.",
+  "하루에 한 포켓몬을 맞힙니다. 무늬·색상 등 외형만 다른 모습은 하나로 합칩니다. 리전 폼·메가진화 등 전투 특성이 다른 모습은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.":
+    "Guess one Pokemon each day. Cosmetic variations such as patterns and colors count as one entry. Regional, Mega and other forms with different battle traits are separate answers, except for selected event and commemorative variants.",
   "유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.":
     "Higher similarity means a closer match. Only the exact answer scores <strong>100 and ranks #1.</strong> Equal scores share a rank.",
   "힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.":
