@@ -240,6 +240,72 @@ test("wrong guesses can be rejected, reversed or followed by more questions", as
   await expect(page.locator(".pn-guess")).toBeVisible();
 });
 
+test("a yes to Red/Green ends debut questions through undo, reload and language changes", async ({
+  page,
+}) => {
+  const r = newRound(game, "audit"),
+    target = candidate("mew"),
+    index = game.pokemon.indexOf(target);
+  for (let i = 0; i < 25; i++) {
+    const v = viewRound(game, r);
+    expect(v.kind).toBe("question");
+    if (v.question.id === "debut-red-green-japan") break;
+    const value = v.question.values[index];
+    answerQuestion(game, r, value === -1 ? "unknown" : value ? "yes" : "no");
+  }
+  expect(viewRound(game, r).question.id).toBe("debut-red-green-japan");
+  await page.goto("./pokinator.html");
+  await seed(page, r);
+  await page.locator('[data-answer="yes"]').click();
+  await page.locator('[data-action="undo"]').click();
+  await expect(page.locator("#pn-prompt")).toHaveAttribute(
+    "data-question",
+    "debut-red-green-japan",
+  );
+  await page.locator('[data-answer="yes"]').click();
+  await page.reload();
+  await page.locator("[data-language-select]").selectOption("en");
+  let found = false;
+  for (let i = 0; i < 30; i++) {
+    if (await page.locator(".pn-question").count()) {
+      const id = await page.locator("#pn-prompt").getAttribute("data-question");
+      expect(id.startsWith("debut-")).toBe(false);
+      const value = game.questionById.get(id).values[index];
+      await page
+        .locator(
+          `[data-answer="${value === -1 ? "unknown" : value ? "yes" : "no"}"]`,
+        )
+        .click();
+    } else if (await page.locator(".pn-guess").count()) {
+      if (
+        (await page.locator(".pn-character").innerText()).includes(
+          target.english,
+        )
+      ) {
+        await page.locator('[data-action="confirm"]').click();
+        found = true;
+        break;
+      }
+      await page.locator('[data-action="reject"]').click();
+    } else break;
+  }
+  expect(found).toBe(true);
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)),
+    STORAGE_KEY,
+  );
+  expect(saved.id).toBe(r.id);
+  expect(
+    saved.events
+      .filter((e) => e.kind === "answer" && e.question.startsWith("debut-"))
+      .at(-1),
+  ).toEqual({
+    kind: "answer",
+    question: "debut-red-green-japan",
+    value: "yes",
+  });
+});
+
 test("25 unknowns end without a fake guess; canonical search can reveal the answer with clipboard fallback", async ({
   page,
 }) => {
@@ -267,6 +333,70 @@ test("25 unknowns end without a fake guess; canonical search can reveal the answ
   await expect(page.locator(".pn-complete")).toBeVisible();
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator(".pn-records b")).toHaveText("놓침");
+});
+
+test("old single-Psychic memory survives migration and avoids implied questions with trivia unknowns", async ({
+  page,
+}) => {
+  const target = candidate("mr-mime"),
+    index = game.pokemon.indexOf(target);
+  const r = newRound(game, "human-audit-0");
+  r.dataVersion = "dd9a765f728dfe67";
+  r.events = [
+    { kind: "answer", question: "dual-type", value: "no" },
+    { kind: "answer", question: "type-14", value: "yes" },
+    { kind: "answer", question: "regional", value: "no" },
+    { kind: "answer", question: "debut-red-green-japan", value: "yes" },
+  ];
+  await page.goto("./pokinator.html");
+  await seed(page, r);
+  await expect(page.locator("#pn-updated")).toHaveCount(0);
+  await expect(page.locator(".pn-counter strong")).toHaveText("4");
+  await page.locator("[data-language-select]").selectOption("en");
+  let found = false;
+  for (let step = 0; step < 30; step++) {
+    if (await page.locator(".pn-question").count()) {
+      const q = game.questionById.get(
+        await page.locator("#pn-prompt").getAttribute("data-question"),
+      );
+      expect(q.group).not.toBe("generation");
+      expect(q.group).not.toBe("type");
+      expect(q.id.startsWith("region-")).toBe(false);
+      const value =
+        ["stats", "abilities", "size", "eggs", "biology"].includes(q.group) ||
+        q.values[index] === -1
+          ? "unknown"
+          : q.values[index]
+            ? "yes"
+            : "no";
+      await page.locator(`[data-answer="${value}"]`).click();
+    } else if (await page.locator(".pn-guess").count()) {
+      if (
+        (await page.locator(".pn-character").innerText()).includes(
+          target.english,
+        )
+      ) {
+        await page.locator('[data-action="confirm"]').click();
+        found = true;
+        break;
+      }
+      await page.locator('[data-action="reject"]').click();
+    } else break;
+    if (step === 3) {
+      await page.reload();
+      await expect(page.locator("#pn-prompt")).toBeVisible();
+    }
+  }
+  expect(found).toBe(true);
+  await page.reload();
+  await expect(page.locator(".pn-complete")).toBeVisible();
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)),
+    STORAGE_KEY,
+  );
+  expect(saved.id).toBe(r.id);
+  expect(saved.dataVersion).toBe(game.dataVersion);
+  expect(saved.events.slice(0, 4)).toEqual(r.events);
 });
 
 test("new-round confirmation preserves or replaces only this game's progress", async ({
@@ -406,6 +536,49 @@ test("long game-title debut questions fit both languages and mobile sizes", asyn
     }
   }
 });
+
+for (const id of ["starter-family", "fossil-family", "standalone"]) {
+  test(`${id} and its scope note fit both languages on mobile and desktop`, async ({
+    page,
+  }) => {
+    const q = data.questions.find((q) => q.id === id);
+    await page.route("**/pokinator.json", (route) =>
+      route.fulfill({ json: { ...data, questions: [q] } }),
+    );
+    await page.goto("./pokinator.html");
+    for (const language of ["ko", "en"]) {
+      await page.locator("[data-language-select]").selectOption(language);
+      await expect(page.locator("#pn-prompt")).toHaveText(q[language]);
+      await expect(page.locator("#pn-question-note")).toHaveText(
+        q.note[language],
+      );
+      for (const width of [320, 390, 1440]) {
+        await page.setViewportSize({ width, height: 844 });
+        expect(
+          await page.locator("#pn-stage").evaluate((el) => {
+            const prompt = el.querySelector("#pn-prompt"),
+              note = el.querySelector("#pn-question-note"),
+              buttons = el.querySelector(".pn-answer-buttons");
+            return (
+              document.documentElement.scrollWidth <= innerWidth &&
+              [prompt, note, buttons].every(
+                (node) => node.scrollWidth <= node.clientWidth,
+              ) &&
+              prompt.getBoundingClientRect().bottom <=
+                note.getBoundingClientRect().top &&
+              note.getBoundingClientRect().bottom <=
+                buttons.getBoundingClientRect().top
+            );
+          }),
+        ).toBe(true);
+        await page.screenshot({
+          path: `.preview/pokinator-${id}-${language}-${width}.png`,
+          fullPage: true,
+        });
+      }
+    }
+  });
+}
 
 test("question, guess, shortlist, result and help fit mobile and desktop in both languages with nonblank sprites", async ({
   page,

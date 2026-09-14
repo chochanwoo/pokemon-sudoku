@@ -14,6 +14,157 @@ const normalize = (values) => {
 };
 const entropy = (p) =>
   p > 0 && p < 1 ? -p * Math.log2(p) - (1 - p) * Math.log2(1 - p) : 0;
+// Model priors, not confidence calibrated from real players. Each category
+// mixes reliable (question error) and uninformative (coin-flip) memories.
+// Type history splits trusted memory into current (0.70) and historical (0.25).
+const MEMORY_PRIOR = 0.95;
+const HISTORICAL_PRIOR = 0.25;
+const ANSWERABILITY = {
+  form: 0.95,
+  type: 0.9,
+  rarity: 0.9,
+  evolution: 0.85,
+  generation: 0.7,
+  appearance: 0.9,
+  recognition: 0.9,
+  biology: 0.6,
+  stats: 0.35,
+  abilities: 0.4,
+  size: 0.2,
+  eggs: 0.15,
+};
+const views = new WeakMap();
+
+function logicalFamily(q) {
+  if (
+    ["type", "form", "rarity", "evolution", "generation", "biology"].includes(
+      q.group,
+    )
+  )
+    return q.group;
+  for (const prefix of ["color", "height", "weight", "bst"])
+    if (q.id.startsWith(`${prefix}-`)) return prefix;
+  return null;
+}
+
+function logicalDomains(questions, count) {
+  const families = new Map();
+  for (const q of questions) {
+    const family = logicalFamily(q);
+    if (!family) continue;
+    if (!families.has(family)) families.set(family, []);
+    families.get(family).push(q);
+  }
+  return [...families.values()].map((members) => {
+    const patterns = new Set();
+    for (let i = 0; i < count; i++) {
+      const row = members.map((q) => q.values[i]);
+      if (!row.includes(-1)) patterns.add(row.join(""));
+    }
+    return { members, patterns: [...patterns] };
+  });
+}
+
+function impliedQuestions(game, answers) {
+  const implied = new Set();
+  for (const { members, patterns } of game.domains) {
+    const constraints = members.flatMap((q, i) =>
+      answers.has(q.id) ? [[i, answers.get(q.id)]] : [],
+    );
+    if (!constraints.length) continue;
+    const remaining = patterns.filter((row) =>
+      constraints.every(([i, value]) => Number(row[i]) === value),
+    );
+    // Contradictory memories suspend deductions, never remove candidates.
+    if (!remaining.length) continue;
+    members.forEach((q, i) => {
+      if (remaining.every((row) => row[i] === remaining[0][i]))
+        implied.add(q.id);
+    });
+  }
+  return implied;
+}
+
+function predictAnswer(state, q) {
+  const reliability = state.reliability.get(q.group);
+  const historical = state.historical.get(q.group);
+  const probabilities = new Float64Array(state.weights.length);
+  let knownMass = 0,
+    yesMass = 0;
+  for (let i = 0; i < probabilities.length; i++) {
+    if (q.values[i] === -1) continue;
+    const trusted = reliability ? reliability[i] : MEMORY_PRIOR;
+    const past = historical
+      ? historical[i]
+      : q.pastValues
+        ? (trusted * HISTORICAL_PRIOR) / MEMORY_PRIOR
+        : 0;
+    probabilities[i] =
+      (trusted - past) * (q.values[i] ? 1 - q.error : q.error) +
+      past * ((q.pastValues || q.values)[i] ? 1 - q.error : q.error) +
+      (1 - trusted) * 0.5;
+    knownMass += state.weights[i];
+    yesMass += state.weights[i] * probabilities[i];
+  }
+  const probabilityYes = knownMass > 0 ? yesMass / knownMass : 0.5;
+  // Missing database facts carry the population prediction, hence no evidence.
+  for (let i = 0; i < probabilities.length; i++)
+    if (q.values[i] === -1) probabilities[i] = probabilityYes;
+  return { probabilities, probabilityYes, knownMass };
+}
+
+export function evaluateQuestion(state, q) {
+  const prediction = predictAnswer(state, q);
+  let conditionalEntropy = 0;
+  for (let i = 0; i < state.weights.length; i++)
+    conditionalEntropy +=
+      state.weights[i] * entropy(prediction.probabilities[i]);
+  return {
+    ...prediction,
+    gain: Math.max(0, entropy(prediction.probabilityYes) - conditionalEntropy),
+  };
+}
+
+function updateBeliefs(state, q, yes) {
+  const { probabilities } = predictAnswer(state, q);
+  let reliability = state.reliability.get(q.group);
+  if (!reliability) {
+    reliability = new Float64Array(state.weights.length).fill(MEMORY_PRIOR);
+    state.reliability.set(q.group, reliability);
+  }
+  let historical = state.historical.get(q.group);
+  if (q.pastValues && !historical) {
+    historical = reliability.map(
+      (trusted) => (trusted * HISTORICAL_PRIOR) / MEMORY_PRIOR,
+    );
+    state.historical.set(q.group, historical);
+  }
+  state.weights = normalize(
+    state.weights.map((weight, i) => {
+      const likelihood = yes ? probabilities[i] : 1 - probabilities[i];
+      if (q.values[i] !== -1) {
+        const trustedLikelihood =
+          q.values[i] === Number(yes) ? 1 - q.error : q.error;
+        const past = historical ? historical[i] : 0;
+        const pastLikelihood =
+          (q.pastValues || q.values)[i] === Number(yes) ? 1 - q.error : q.error;
+        reliability[i] =
+          ((reliability[i] - past) * trustedLikelihood +
+            past * pastLikelihood) /
+          likelihood;
+        if (historical) historical[i] = (past * pastLikelihood) / likelihood;
+      }
+      return weight * likelihood;
+    }),
+  );
+}
+
+function exclusiveFamily(question) {
+  if (question.group === "generation") return "debut";
+  if (question.id.startsWith("color-")) return "color";
+  if (question.id.startsWith("region-")) return "region";
+  return null;
+}
 
 export function createPokinator(catalog, data) {
   if (
@@ -24,7 +175,12 @@ export function createPokinator(catalog, data) {
     !Array.isArray(data.pokemon) ||
     !data.pokemon.length ||
     !Array.isArray(data.questions) ||
-    !data.questions.length
+    !data.questions.length ||
+    (data.compatibleDataVersions !== undefined &&
+      (!Array.isArray(data.compatibleDataVersions) ||
+        data.compatibleDataVersions.some(
+          (version) => typeof version !== "string",
+        )))
   )
     throw new Error("Invalid Pokinator bundle");
   const source = new Map(catalog.pokemon.map((p) => [p.id, p]));
@@ -61,6 +217,11 @@ export function createPokinator(catalog, data) {
       typeof q.values !== "string" ||
       q.values.length !== pokemon.length ||
       /[^01?]/.test(q.values) ||
+      (q.pastValues !== undefined &&
+        (q.group !== "type" ||
+          typeof q.pastValues !== "string" ||
+          q.pastValues.length !== pokemon.length ||
+          /[^01]/.test(q.pastValues))) ||
       !Number.isFinite(q.error) ||
       q.error <= 0 ||
       q.error >= 0.5 ||
@@ -80,6 +241,9 @@ export function createPokinator(catalog, data) {
     return {
       ...q,
       values: Int8Array.from(q.values, (v) => (v === "?" ? -1 : Number(v))),
+      ...(q.pastValues
+        ? { pastValues: Int8Array.from(q.pastValues, Number) }
+        : {}),
     };
   });
   const questionById = new Map(questions.map((q) => [q.id, q]));
@@ -88,10 +252,12 @@ export function createPokinator(catalog, data) {
   return {
     version: data.version,
     dataVersion: data.dataVersion,
+    compatibleDataVersions: data.compatibleDataVersions || [],
     pokemon,
     byId,
     questions,
     questionById,
+    domains: logicalDomains(questions, pokemon.length),
     priors: normalize(
       Float64Array.from(pokemon, (p) => 1 / speciesCounts.get(p.speciesId)),
     ),
@@ -116,7 +282,8 @@ export function restoreRound(raw, game, fallbackId) {
     if (
       !r ||
       r.version !== game.version ||
-      r.dataVersion !== game.dataVersion ||
+      (r.dataVersion !== game.dataVersion &&
+        !game.compatibleDataVersions.includes(r.dataVersion)) ||
       !Array.isArray(r.events) ||
       r.events.length > MAX_QUESTIONS + MAX_GUESSES + 2
     )
@@ -167,14 +334,38 @@ export function restoreRound(raw, game, fallbackId) {
         !["guessed", "revealed"].includes(r.result.outcome)
       )
         throw new Error("Invalid result");
-      const view = viewRound(game, restored);
-      if (
-        r.result.outcome === "guessed"
-          ? view.kind !== "guess" || view.guess.id !== r.result.id
-          : view.kind !== "shortlist"
-      )
-        throw new Error("Invalid finish");
-      restored.result = { id: r.result.id, outcome: r.result.outcome };
+      const legacyDataVersion =
+        r.result.legacyDataVersion ||
+        (r.dataVersion !== game.dataVersion ? r.dataVersion : null);
+      const migrated = game.compatibleDataVersions.includes(legacyDataVersion);
+      if (legacyDataVersion && !migrated)
+        throw new Error("Invalid result version");
+      let validFinish;
+      if (migrated) {
+        validFinish =
+          r.result.outcome === "guessed"
+            ? known >= 4 &&
+              !stopped &&
+              !rejected.has(r.result.id) &&
+              rejected.size < MAX_GUESSES
+            : stopped ||
+              rejected.size >= MAX_GUESSES ||
+              asked.size >= MAX_QUESTIONS ||
+              known > 0;
+      } else {
+        const view = viewRound(game, restored);
+        validFinish =
+          r.result.outcome === "guessed"
+            ? view.kind === "guess" && view.guess.id === r.result.id
+            : view.kind === "shortlist";
+      }
+      if (!validFinish) throw new Error("Invalid finish");
+      // A human-confirmed result survives model updates and subsequent reloads.
+      restored.result = {
+        id: r.result.id,
+        outcome: r.result.outcome,
+        ...(migrated ? { legacyDataVersion } : {}),
+      };
     }
     return restored;
   } catch {
@@ -183,10 +374,15 @@ export function restoreRound(raw, game, fallbackId) {
 }
 
 export function inference(game, events) {
-  let weights = game.priors.slice();
+  const beliefs = {
+    weights: game.priors.slice(),
+    reliability: new Map(),
+    historical: new Map(),
+  };
   const groups = new Map(),
-    evidenceGroups = new Map(),
+    answers = new Map(),
     unknownGroups = new Map(),
+    resolvedFamilies = new Set(),
     asked = new Set(),
     rejected = new Set();
   let answered = 0,
@@ -209,13 +405,15 @@ export function inference(game, events) {
         continue;
       }
       known++;
-      if (!evidenceGroups.has(q.group)) evidenceGroups.set(q.group, []);
-      evidenceGroups.get(q.group).push({ q, yes: e.value === "yes" ? 1 : 0 });
+      const family = exclusiveFamily(q);
+      if (e.value === "yes" && family) resolvedFamilies.add(family);
+      answers.set(q.id, e.value === "yes" ? 1 : 0);
+      updateBeliefs(beliefs, q, e.value === "yes");
       groups.set(q.group, (groups.get(q.group) || 0) + 1);
     } else if (e.kind === "reject") {
       rejected.add(e.id);
-      weights = normalize(
-        weights.map((w, i) => (game.pokemon[i].id === e.id ? 0 : w)),
+      beliefs.weights = normalize(
+        beliefs.weights.map((w, i) => (game.pokemon[i].id === e.id ? 0 : w)),
       );
       lastPause = answered;
     } else if (e.kind === "continue") {
@@ -223,47 +421,12 @@ export function inference(game, events) {
       continued = true;
     }
   }
-  for (const [, answers] of [...evidenceGroups].sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    const factors = new Float64Array(weights.length).fill(1),
-      facts = new Uint8Array(weights.length);
-    for (const { q, yes } of answers) {
-      const miss = q.error / (1 - q.error);
-      let mass = 0,
-        evidence = 0;
-      for (let i = 0; i < weights.length; i++) {
-        if (q.values[i] === -1) continue;
-        mass += weights[i];
-        evidence += weights[i] * (q.values[i] === yes ? 1 : miss);
-      }
-      const neutral = mass > 0 ? evidence / mass : 1;
-      for (let i = 0; i < weights.length; i++) {
-        if (q.values[i] !== -1) facts[i]++;
-        factors[i] *=
-          q.values[i] === -1 ? neutral : q.values[i] === yes ? 1 : miss;
-      }
-    }
-    // A whole category can reflect one mistaken memory (e.g. old typings).
-    // Mix in a small uninformative component, capping its penalty at 20:1.
-    let mass = 0,
-      evidence = 0;
-    for (let i = 0; i < weights.length; i++) {
-      factors[i] = 0.05 + 0.95 * factors[i];
-      if (facts[i]) {
-        mass += weights[i];
-        evidence += weights[i] * factors[i];
-      }
-    }
-    const neutral = mass > 0 ? evidence / mass : 1;
-    weights = normalize(
-      weights.map((w, i) => w * (facts[i] ? factors[i] : neutral)),
-    );
-  }
   return {
-    weights,
+    ...beliefs,
     groups,
     unknownGroups,
+    resolvedFamilies,
+    implied: impliedQuestions(game, answers),
     asked,
     rejected,
     answered,
@@ -282,6 +445,13 @@ export function nextQuestion(game, state, seed) {
     expertScore = 0;
   for (const q of game.questions) {
     if (state.asked.has(q.id) || q.after > state.answered) continue;
+    // A confirmed single-valued fact needs no more alternatives. This only
+    // suppresses redundant questions; soft candidate weights remain intact.
+    if (
+      state.resolvedFamilies.has(exclusiveFamily(q)) ||
+      state.implied.has(q.id)
+    )
+      continue;
     if (
       q.expert &&
       (state.answered < 16 ||
@@ -289,19 +459,18 @@ export function nextQuestion(game, state, seed) {
         state.expertAnswers >= MAX_EXPERT_QUESTIONS)
     )
       continue;
-    let knownMass = 0,
-      yesMass = 0;
-    for (let i = 0; i < state.weights.length; i++)
-      if (q.values[i] !== -1) {
-        knownMass += state.weights[i];
-        if (q.values[i]) yesMass += state.weights[i];
-      }
+    const known = state.groups.get(q.group) || 0;
+    const unknown = state.unknownGroups.get(q.group) || 0;
+    if (["abilities", "stats"].includes(q.group) && unknown > 0 && known === 0)
+      continue;
+    const { knownMass, gain } = evaluateQuestion(state, q);
     if (knownMass < 0.05) continue;
-    const p = q.error + ((1 - 2 * q.error) * yesMass) / knownMass;
-    const gain = knownMass * (entropy(p) - entropy(q.error));
+    const answerability =
+      (3 * (ANSWERABILITY[q.group] || 0.7) + known) / (3 + known + unknown);
     const score =
-      ((gain * q.ease) / Math.sqrt(1 + (state.groups.get(q.group) || 0))) *
-      0.55 ** (state.unknownGroups.get(q.group) || 0) *
+      gain *
+      q.ease *
+      answerability *
       (1 + (hash(`${seed}:${q.id}`) % 100) / 2000);
     if (q.expert) {
       // Reserve unfamiliar trivia for a substantially better late tiebreaker.
@@ -319,6 +488,10 @@ export function nextQuestion(game, state, seed) {
 }
 
 export function viewRound(game, round) {
+  const signature = JSON.stringify(round);
+  const cached = views.get(round);
+  if (cached?.game === game && cached.signature === signature)
+    return cached.view;
   const state = inference(game, round.events);
   const ranking = game.pokemon
     .map((p, i) => ({ ...p, weight: state.weights[i] }))
@@ -342,7 +515,9 @@ export function viewRound(game, round) {
         : canAsk
           ? "question"
           : "shortlist";
-  return { ...state, kind, question, ranking, guess: ranking[0], canAsk };
+  const view = { ...state, kind, question, ranking, guess: ranking[0], canAsk };
+  views.set(round, { game, signature, view });
+  return view;
 }
 
 export function answerQuestion(game, round, value) {

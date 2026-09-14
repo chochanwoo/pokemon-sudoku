@@ -66,6 +66,41 @@ class PokinatorBuilderTests(unittest.TestCase):
             if q["expert"]:
                 self.assertGreaterEqual(q["after"], 16)
 
+    def test_recognizable_families_include_evolutions_and_forms(self):
+        by_key = {p["key"]: i for i, p in enumerate(self.data["pokemon"])}
+        by_id = {q["id"]: q for q in self.data["questions"]}
+        for question, positive, negative in [
+            ("starter-family", ["bulbasaur", "pichu", "eevee", "raichu-alola", "typhlosion-hisui", "charizard-mega-x", "skeledirge"], ["mew", "mr-mime", "pidgey"]),
+            ("fossil-family", ["omanyte", "kabutops", "aerodactyl-mega", "cradily", "archeops", "tyrantrum", "dracovish", "arctozolt"], ["relicanth", "mew", "genesect"]),
+            ("standalone", ["mew", "aerodactyl-mega", "ditto"], ["pikachu", "mr-mime", "charizard-mega-x"]),
+        ]:
+            q = by_id[question]
+            for keys, expected in [(positive, "1"), (negative, "0")]:
+                for key in keys:
+                    self.assertEqual(q["values"][by_key[key]], expected, f"{question}: {key}")
+            self.assertTrue(q["note"]["ko"] and q["note"]["en"])
+        self.assertIn("dd9a765f728dfe67", self.data["compatibleDataVersions"])
+
+    def test_past_typings_come_from_each_pokemon_not_its_original_form(self):
+        by_key = {p["key"]: i for i, p in enumerate(self.data["pokemon"])}
+        by_id = {q["id"]: q for q in self.data["questions"]}
+        for key, question, modern, old in [
+            ("mr-mime", "dual-type", "1", "0"), ("mr-mime", "type-14", "1", "1"),
+            ("clefairy", "type-1", "0", "1"), ("clefairy", "type-18", "1", "0"),
+            ("gardevoir", "dual-type", "1", "0"), ("magnemite", "type-9", "1", "0"),
+            ("mr-mime-galar", "type-15", "1", "1"), ("vulpix-alola", "type-10", "0", "0"),
+            ("gardevoir-mega", "type-18", "1", "1"),
+        ]:
+            q, i = by_id[question], by_key[key]
+            self.assertEqual(q["values"][i], modern, key)
+            self.assertEqual(q["pastValues"][i], old, key)
+        for q in self.data["questions"]:
+            if q["group"] == "type":
+                self.assertEqual(len(q["pastValues"]), len(self.data["pokemon"]))
+                self.assertTrue(set(q["pastValues"]) <= {"0", "1"})
+            else:
+                self.assertNotIn("pastValues", q)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,6 +15,14 @@ REGIONS = {"alola": ("알로라", "Alolan"), "galar": ("가라르", "Galarian"),
 COLORS = {"black": "검정", "blue": "파랑", "brown": "갈색", "gray": "회색",
           "green": "초록", "pink": "분홍", "purple": "보라", "red": "빨강",
           "white": "흰색", "yellow": "노랑"}
+# Main-series first partners, including Let's Go, and fossil restoration species.
+# https://pokemonletsgo.pokemon.com/en-us/story/
+# https://www.pokemon.com/us/pokemon-news/fossil-pokemon-take-over-pokemon-gos-2023-adventure-week
+# https://www.pokemon.com/uk/pokedex/dracovish
+STARTERS = {1, 4, 7, 25, 133, 152, 155, 158, 252, 255, 258, 387, 390, 393,
+            495, 498, 501, 650, 653, 656, 722, 725, 728, 810, 813, 816, 906, 909, 912}
+FOSSILS = {138, 140, 142, 345, 347, 408, 410, 564, 566, 696, 698, 880, 881, 882, 883}
+COMPATIBLE_DATA_VERSIONS = ["dd9a765f728dfe67"]
 DEBUT_GAMES = {
     "red-green-japan": ("포켓몬스터 레드/그린", "Pokemon Red/Blue"),
     "gold-silver": ("포켓몬스터 금/은", "Pokemon Gold/Silver"),
@@ -51,6 +59,10 @@ def build():
     if clues["catalogVersion"] != catalog["version"]:
         raise ValueError("Clues and catalog must use the same version")
     clue_by_id = {p["id"]: p for p in clues["pokemon"]}
+    family_by_species = {p["speciesId"]: p["family"] for p in clues["pokemon"]}
+    family_sizes = Counter(family_by_species.values())
+    starter_families = {family_by_species[s] for s in STARTERS}
+    fossil_families = {family_by_species[s] for s in FOSSILS}
     with sqlite3.connect(f"file:{(ROOT / 'data/build/pokemon.db').as_posix()}?mode=ro", uri=True) as db:
         db.row_factory = sqlite3.Row
         species = {r["id"]: dict(r) for r in db.execute("SELECT * FROM pokemon_species")}
@@ -74,6 +86,19 @@ def build():
             raise ValueError(f"Missing debut question: {version}")
         return version
 
+    type_ids = {t["key"]: t["id"] for t in catalog["types"]}
+
+    @lru_cache(None)
+    def past_types(pokemon_id, current):
+        raw = json.loads((CACHE.parent / "pokemon" / f"{pokemon_id}.json").read_text(encoding="utf-8"))
+        if raw.get("id") != pokemon_id:
+            raise ValueError(f"Mismatched type history: {pokemon_id}")
+        history = raw.get("past_types", [])
+        if not history:
+            return list(current)
+        oldest = min(history, key=lambda h: int(h["generation"]["url"].rstrip("/").rsplit("/", 1)[-1]))
+        return [type_ids[t["type"]["name"]] for t in oldest["types"]]
+
     rows, traits = [], []
     for entry in catalog["pokemon"]:
         form, p, s = forms[entry["id"]], pokemon[entry["pokemonId"]], species[entry["speciesId"]]
@@ -88,8 +113,12 @@ def build():
                      "english": s["name_en"] if kind == "base" else None})
         # Species-level appearance is not reliable for regional or Mega forms.
         traits.append({"kind": kind, "region": region, "types": entry["types"],
+                       "pastTypes": past_types(entry["pokemonId"], tuple(entry["types"])),
                        "debut": debut(base_forms[s["id"]]["id"] if kind == "mega" else form["id"]),
                        "stage": clue["stage"],
+                       "standalone": family_sizes[clue["family"]] == 1,
+                       "starter": clue["family"] in starter_families,
+                       "fossil": clue["family"] in fossil_families,
                        "rare": bool(s["is_legendary"] or s["is_mythical"]),
                        "mythical": bool(s["is_mythical"]), "baby": bool(s["is_baby"]),
                        "gender": s["gender_rate"], "bst": p["base_stat_total"] or None,
@@ -109,9 +138,11 @@ def build():
         values = [predicate(p) for p in traits]
         if True not in values or False not in values:
             return
+        historical = [predicate({**p, "types": p["pastTypes"]}) for p in traits] if group == "type" else None
         questions.append({"id": key, "ko": ko, "en": en, "group": group,
                           "ease": ease, "error": error, "after": after, "expert": expert,
                           **({"note": note} if note else {}),
+                          **({"pastValues": "".join("1" if v else "0" for v in historical)} if historical is not None else {}),
                           "values": "".join("?" if v is None else "1" if v else "0" for v in values)})
 
     add("mega", "생각한 모습이 메가진화한 모습인가요?", "Are you thinking of a Mega Evolution?", "form", lambda p: p["kind"] == "mega", 1.3, .03)
@@ -127,6 +158,12 @@ def build():
         note={"ko": "메가진화는 진화 단계로 세지 않아요.", "en": "Mega Evolution does not count as an evolution stage."})
     add("third-stage", "베이비 포켓몬을 포함해 진화 계열의 세 번째 단계인가요?", "Is it the third stage of its evolution line, counting baby Pokemon?", "evolution", lambda p: p["stage"] >= 3, .75, .1, 4)
     add("baby", "베이비 포켓몬인가요?", "Is it a baby Pokemon?", "evolution", lambda p: p["baby"], .9, .07)
+    add("standalone", "진화 계열이 없는 단독 포켓몬인가요?", "Is it a standalone Pokemon with no evolution relatives?", "evolution", lambda p: p["standalone"], 1.05, .09,
+        note={"ko": "메가진화와 폼체인지는 제외해요.", "en": "Do not count Mega Evolutions or form changes."})
+    add("starter-family", "스타팅 포켓몬의 진화 계열인가요?", "Does it belong to a first-partner Pokemon's evolution family?", "recognition", lambda p: p["starter"], 1.1, .09,
+        note={"ko": "피카츄·이브이의 계열과 리전폼·메가진화도 포함해요.", "en": "Includes the Pikachu and Eevee families, regional forms and Mega Evolutions."})
+    add("fossil-family", "화석에서 복원되는 포켓몬의 진화 계열인가요?", "Does it belong to a fossil Pokemon's evolution family?", "recognition", lambda p: p["fossil"], 1.0, .08,
+        note={"ko": "화석에서 복원된 포켓몬과 그 진화체를 포함해요.", "en": "Includes restored fossil Pokemon and their evolutions."})
     for version, (ko, en) in DEBUT_GAMES.items():
         dlc = version in {"sword-shield", "scarlet-violet"}
         add(f"debut-{version}", f"{ko}에서 최초로 등장했나요?",
@@ -162,6 +199,7 @@ def build():
             continue
         add(f"ability-{ability['id']}", f"숨겨진 특성을 포함해 '{ability['name']}' 특성을 가질 수 있나요?", f"Can it have {ability['english']}, including as a Hidden Ability?", "abilities", lambda p, n=ability["id"]: None if p["abilities"] is None else n in p["abilities"], .4, .07, 9)
     data = {"version": "pokinator-v2", "policy": "base-regional-mega-v1", "catalogVersion": catalog["version"],
+            "compatibleDataVersions": COMPATIBLE_DATA_VERSIONS,
             "pokemon": rows, "questions": questions, "counts": dict(Counter(p["kind"] for p in rows))}
     data["dataVersion"] = hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:16]
     return data

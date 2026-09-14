@@ -6,6 +6,7 @@ import {
   newRound,
   restoreRound,
   inference,
+  evaluateQuestion,
   nextQuestion,
   viewRound,
   answerQuestion,
@@ -167,8 +168,294 @@ test("correlated evidence has no first-answer advantage and a type mistake has a
     { ...b, value: "no" },
     { kind: "answer", question: "type-18", value: "no" },
   ]);
-  const ratios = [...contradicted.weights].map((w, i) => w / game.priors[i]);
-  assert.ok(Math.max(...ratios) / Math.min(...ratios) <= 20 + 1e-10);
+  assert.ok(contradicted.weights.every((w) => w > 0));
+  assert.ok(
+    contradicted.reliability.get("type")[mime] <
+      first.reliability.get("type")[mime],
+  );
+});
+
+test("historical typing is a coherent alternative memory, not an extra independent clue", () => {
+  const mime = game.pokemon.indexOf(byKey("mr-mime"));
+  const answers = [
+    { kind: "answer", question: "dual-type", value: "no" },
+    { kind: "answer", question: "type-14", value: "yes" },
+    { kind: "answer", question: "type-18", value: "no" },
+  ];
+  const state = inference(game, answers),
+    reversed = inference(game, [...answers].reverse());
+  assert.ok(state.historical.get("type")[mime] > 0.8);
+  state.weights.forEach((weight, i) =>
+    assert.ok(Math.abs(weight - reversed.weights[i]) < 1e-12),
+  );
+  assert.ok(state.weights.every((weight) => weight > 0));
+  const modern = inference(
+    game,
+    answers.map((answer) => ({
+      ...answer,
+      value: game.questionById.get(answer.question).values[mime] ? "yes" : "no",
+    })),
+  );
+  assert.ok(modern.historical.get("type")[mime] < 0.1);
+  const unchanged = game.pokemon.indexOf(byKey("mew"));
+  assert.ok(
+    Math.abs(
+      state.historical.get("type")[unchanged] /
+        state.reliability.get("type")[unchanged] -
+        0.25 / 0.95,
+    ) < 1e-12,
+  );
+});
+
+test("question gains and predicted posteriors exactly match real answer updates", () => {
+  const H = (weights) =>
+    [...weights].reduce((sum, p) => sum - (p ? p * Math.log2(p) : 0), 0);
+  for (const events of [
+    [],
+    [
+      { kind: "answer", question: "dual-type", value: "no" },
+      { kind: "answer", question: "type-14", value: "no" },
+      { kind: "answer", question: "type-18", value: "no" },
+      { kind: "answer", question: "color-red", value: "no" },
+      { kind: "answer", question: "ability-1", value: "unknown" },
+      { kind: "reject", id: byKey("pikachu").id },
+    ],
+  ]) {
+    const state = inference(game, events);
+    for (const id of [
+      "type-1",
+      "type-10",
+      "color-blue",
+      "regional",
+      "starter-family",
+    ]) {
+      const q = game.questionById.get(id),
+        predicted = evaluateQuestion(state, q);
+      const branches = ["yes", "no"].map((value) =>
+        inference(game, [...events, { kind: "answer", question: id, value }]),
+      );
+      const p = predicted.probabilityYes;
+      assert.ok(
+        Math.abs(
+          predicted.gain -
+            (H(state.weights) -
+              p * H(branches[0].weights) -
+              (1 - p) * H(branches[1].weights)),
+        ) < 1e-11,
+        id,
+      );
+      branches.forEach((branch, answer) =>
+        branch.weights.forEach((w, i) => {
+          const likelihood = answer
+            ? 1 - predicted.probabilities[i]
+            : predicted.probabilities[i];
+          assert.ok(
+            Math.abs(
+              w - (state.weights[i] * likelihood) / (answer ? 1 - p : p),
+            ) < 1e-12,
+            id,
+          );
+        }),
+      );
+    }
+  }
+});
+
+test("contradicted category memories cannot advertise an independent fresh-question gain", () => {
+  const q = game.questionById.get("type-1");
+  const tinyQuestion = {
+    ...q,
+    values: Int8Array.of(0, 1),
+    pastValues: undefined,
+  };
+  const fresh = { ...inference(game, []), weights: Float64Array.of(0.5, 0.5) };
+  const contradicted = {
+    ...fresh,
+    reliability: new Map([["type", Float64Array.of(0.02, 0.02)]]),
+  };
+  assert.ok(evaluateQuestion(fresh, tinyQuestion).gain > 0.4);
+  assert.ok(evaluateQuestion(contradicted, tinyQuestion).gain < 0.001);
+});
+
+test("within-property implications suppress questions, not candidates or unrelated evidence", () => {
+  const event = (question, value = "yes") => ({
+    kind: "answer",
+    question,
+    value,
+  });
+  for (const [events, blocked] of [
+    [
+      [event("regional", "no")],
+      ["region-alola", "region-hisui", "region-paldea", "region-galar"],
+    ],
+    [
+      [event("dual-type", "no"), event("type-14")],
+      ["type-18", "type-1", "type-10"],
+    ],
+    [
+      [event("dual-type"), event("type-14"), event("type-18")],
+      ["type-1", "type-10"],
+    ],
+    [[event("evolved", "no")], ["third-stage"]],
+    [[event("standalone")], ["evolved", "third-stage", "baby"]],
+    [[event("mythical")], ["rare"]],
+    [[event("bst-600")], ["bst-300", "bst-450", "bst-550"]],
+    [[event("height-10", "no")], ["height-20", "height-40"]],
+  ]) {
+    const state = inference(game, events);
+    for (const id of blocked) {
+      assert.ok(state.implied.has(id), `${events[0].question}: ${id}`);
+      assert.equal(
+        nextQuestion(
+          { ...game, questions: [game.questionById.get(id)] },
+          state,
+          "logic",
+        ),
+        null,
+      );
+    }
+    assert.ok(state.weights.every((w) => w > 0));
+  }
+  const dual = inference(game, [event("dual-type"), event("type-14")]);
+  assert.ok(!dual.implied.has("type-18"));
+  assert.ok(!dual.implied.has("two-legs"));
+  const unknown = inference(game, [event("regional", "unknown")]);
+  assert.ok(!unknown.implied.has("region-hisui"));
+  const inconsistent = inference(game, [
+    event("dual-type", "no"),
+    event("type-14"),
+    event("type-18"),
+  ]);
+  assert.ok(!inconsistent.implied.has("type-10"));
+  assert.ok(inconsistent.weights.every((w) => w > 0));
+});
+
+test("a confirmed debut stops all other debut questions without removing candidates", () => {
+  const question = "debut-red-green-japan",
+    event = { kind: "answer", question, value: "yes" },
+    onlyDebuts = {
+      ...game,
+      questions: game.questions.filter((q) => q.group === "generation"),
+    };
+  const confirmed = inference(game, [event]);
+  assert.equal(nextQuestion(onlyDebuts, confirmed, "audit"), null);
+  assert.ok(confirmed.weights.every((w) => w > 0));
+  for (const value of ["no", "unknown"]) {
+    const next = nextQuestion(
+      onlyDebuts,
+      inference(game, [{ ...event, value }]),
+      "audit",
+    );
+    assert.ok(next);
+    assert.notEqual(next.id, question);
+  }
+  const r = newRound(game, "saved-debut");
+  r.events.push(event);
+  const restored = restoreRound(JSON.stringify(r), game, "fallback");
+  assert.deepEqual(restored, r);
+  assert.equal(
+    nextQuestion(onlyDebuts, inference(game, restored.events), "audit"),
+    null,
+  );
+  assert.ok(undo(restored));
+  assert.ok(
+    nextQuestion(onlyDebuts, inference(game, restored.events), "audit"),
+  );
+  r.events.push({ ...event, question: "debut-ruby-sapphire", value: "no" });
+  const legacy = restoreRound(JSON.stringify(r), game, "fallback");
+  assert.deepEqual(legacy, r);
+  assert.equal(
+    nextQuestion(onlyDebuts, inference(game, legacy.events), "audit"),
+    null,
+  );
+});
+
+test("exclusive color and region answers do not suppress unrelated or multivalued traits", () => {
+  const events = ["color-red", "region-hisui"].map((question) => ({
+    kind: "answer",
+    question,
+    value: "yes",
+  }));
+  const state = inference(game, events);
+  const subset = (filter) => ({
+    ...game,
+    questions: game.questions.filter(filter),
+  });
+  assert.equal(
+    nextQuestion(
+      subset((q) => q.id.startsWith("color-")),
+      state,
+      "audit",
+    ),
+    null,
+  );
+  assert.equal(
+    nextQuestion(
+      subset((q) => q.id.startsWith("region-")),
+      state,
+      "audit",
+    ),
+    null,
+  );
+  for (const id of ["two-legs", "type-10"])
+    assert.equal(
+      nextQuestion(
+        subset((q) => q.id === id),
+        state,
+        "audit",
+      ).id,
+      id,
+    );
+  for (const id of ["mega", "regional"]) assert.ok(state.implied.has(id));
+  const dual = inference(game, [
+    { kind: "answer", question: "type-14", value: "yes" },
+  ]);
+  assert.equal(
+    nextQuestion(
+      subset((q) => q.id === "type-18"),
+      dual,
+      "audit",
+    ).id,
+    "type-18",
+  );
+});
+
+test("adaptive rounds never ask another debut after yes, including wrong debut memories", () => {
+  for (const [key, wrongDebut] of [
+    ["mr-mime", false],
+    ["mew", false],
+    ["gardevoir", true],
+  ]) {
+    const target = byKey(key),
+      index = game.pokemon.indexOf(target),
+      r = newRound(game, "audit");
+    if (wrongDebut)
+      r.events.push({
+        kind: "answer",
+        question: "debut-red-green-japan",
+        value: "yes",
+      });
+    let confirmed = wrongDebut;
+    let found = false;
+    for (let step = 0; step < 30; step++) {
+      const v = viewRound(game, r);
+      if (v.kind === "question") {
+        const q = v.question;
+        if (confirmed) assert.notEqual(q.group, "generation", key);
+        const answer =
+          q.values[index] === -1 ? "unknown" : q.values[index] ? "yes" : "no";
+        if (q.group === "generation" && answer === "yes") confirmed = true;
+        answerQuestion(game, r, answer);
+      } else if (v.kind === "guess" && v.guess.id !== target.id)
+        rejectGuess(game, r);
+      else {
+        found = v.kind === "guess";
+        break;
+      }
+    }
+    assert.ok(confirmed, key);
+    assert.ok(found, key);
+  }
 });
 
 test("size and egg questions need a strong late advantage, are capped, and stop after unknown", () => {
@@ -269,6 +556,60 @@ test("Mr Mime recovers from old single-Psychic memories without expert answers",
   }
 });
 
+test("casual players can finish representative rounds despite trivia unknowns and correlated old typings", () => {
+  for (const key of [
+    "mr-mime",
+    "clefairy",
+    "gardevoir",
+    "mew",
+    "pikachu",
+    "ditto",
+    "arceus",
+    "aerodactyl",
+    "charizard-mega-x",
+    "growlithe-hisui",
+    "vulpix-alola",
+  ]) {
+    const target = byKey(key),
+      index = game.pokemon.indexOf(target);
+    for (let seed = 0; seed < 5; seed++) {
+      const r = newRound(game, `human-audit-${seed}`),
+        trivia = new Map();
+      let success = false;
+      for (let step = 0; step < MAX_QUESTIONS + 4; step++) {
+        const v = viewRound(game, r);
+        if (v.kind === "guess") {
+          if (v.guess.id === target.id) {
+            success = true;
+            break;
+          }
+          rejectGuess(game, r);
+        } else if (v.kind === "question") {
+          const q = v.question;
+          let value =
+            q.values[index] === -1 ? "unknown" : q.values[index] ? "yes" : "no";
+          if (
+            ["stats", "abilities", "size", "eggs", "biology"].includes(q.group)
+          ) {
+            value = "unknown";
+            trivia.set(q.group, (trivia.get(q.group) || 0) + 1);
+          }
+          if (
+            ["mr-mime", "clefairy", "gardevoir"].includes(key) &&
+            ["dual-type", "type-18"].includes(q.id)
+          )
+            value = "no";
+          if (key === "clefairy" && q.id === "type-1") value = "yes";
+          answerQuestion(game, r, value);
+        } else break;
+      }
+      assert.ok(success, `${key}: ${seed}`);
+      assert.ok((trivia.get("abilities") || 0) <= 1);
+      assert.ok((trivia.get("stats") || 0) <= 1);
+    }
+  }
+});
+
 test("honest sample play converges without answer-name questions, including Mega and regional targets", () => {
   for (const key of [
     "bulbasaur",
@@ -362,6 +703,53 @@ test("saves round-trip questions, rejections, paused guesses and completed resul
     restoreRound(JSON.stringify(manual), game, "fallback"),
     manual,
   );
+});
+
+test("compatible question additions preserve old progress and human-confirmed results across repeated reloads", () => {
+  const old = newRound(game, "before-update");
+  old.dataVersion = "dd9a765f728dfe67";
+  old.events = [
+    { kind: "answer", question: "dual-type", value: "no" },
+    { kind: "answer", question: "type-14", value: "yes" },
+    { kind: "answer", question: "evolved", value: "yes" },
+    { kind: "answer", question: "debut-red-green-japan", value: "yes" },
+  ];
+  const restored = restoreRound(JSON.stringify(old), game, "fallback");
+  assert.equal(restored.id, old.id);
+  assert.equal(restored.dataVersion, game.dataVersion);
+  assert.deepEqual(restored.events, old.events);
+  assert.deepEqual(
+    restoreRound(JSON.stringify(restored), game, "fallback"),
+    restored,
+  );
+  for (const outcome of ["guessed", "revealed"]) {
+    old.result = { id: byKey("mr-mime").id, outcome };
+    const completed = restoreRound(JSON.stringify(old), game, "fallback");
+    assert.equal(completed.result.id, old.result.id);
+    assert.equal(viewRound(game, completed).kind, "complete");
+    assert.deepEqual(
+      restoreRound(JSON.stringify(completed), game, "fallback"),
+      completed,
+    );
+  }
+});
+
+test("cached views update after undo, same-length answer edits and completion", () => {
+  const r = newRound(game, "cache");
+  const initial = viewRound(game, r);
+  assert.equal(viewRound(game, r), initial);
+  answerQuestion(game, r, "yes");
+  const yes = viewRound(game, r);
+  r.events[0].value = "no";
+  const no = viewRound(game, r);
+  assert.notEqual(no, yes);
+  assert.notDeepEqual(no.weights, yes.weights);
+  undo(r);
+  assert.deepEqual(viewRound(game, r).weights, initial.weights);
+  stopRound(r);
+  assert.equal(viewRound(game, r).kind, "shortlist");
+  finishRound(game, r, byKey("mew").id);
+  assert.equal(viewRound(game, r).kind, "complete");
 });
 
 test("corrupt saves and incompatible bundles fail safely without accepting impossible results", () => {
