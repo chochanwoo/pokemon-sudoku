@@ -6,6 +6,7 @@ import {
   newRound,
   restoreRound,
   inference,
+  nextQuestion,
   viewRound,
   answerQuestion,
   rejectGuess,
@@ -97,8 +98,9 @@ test("form-specific evidence and unknown appearance do not inherit base form tra
   assert.equal(fact("type-15", "vulpix-alola"), 1);
   assert.equal(fact("color-red", "vulpix-alola"), -1);
   assert.equal(fact("four-legs", "venusaur-mega"), -1);
-  assert.equal(fact("gen-until-7", "growlithe-hisui"), 0);
-  assert.equal(fact("gen-until-1", "charizard-mega-x"), 1);
+  assert.equal(fact("debut-sword-shield", "growlithe-hisui"), 0);
+  assert.equal(fact("debut-legends-arceus", "growlithe-hisui"), 1);
+  assert.equal(fact("debut-red-green-japan", "charizard-mega-x"), 1);
 });
 
 test("priors give each species equal mass regardless of its number of forms", () => {
@@ -143,6 +145,130 @@ test("question selection is deterministic, adaptive and respects expert-question
   }
 });
 
+test("correlated evidence has no first-answer advantage and a type mistake has a softer penalty", () => {
+  const a = { kind: "answer", question: "dual-type", value: "no" },
+    b = { kind: "answer", question: "type-14", value: "yes" };
+  const forward = inference(game, [a, b]),
+    backward = inference(game, [b, a]);
+  forward.weights.forEach((weight, i) =>
+    assert.ok(Math.abs(weight - backward.weights[i]) < 1e-12),
+  );
+  const mime = game.pokemon.indexOf(byKey("mr-mime")),
+    drowzee = game.pokemon.indexOf(byKey("drowzee")),
+    first = inference(game, [a]);
+  const penalty =
+    first.weights[drowzee] /
+    first.weights[mime] /
+    (game.priors[drowzee] / game.priors[mime]);
+  assert.ok(penalty < 8);
+  assert.ok(first.weights[mime] > 0);
+  const contradicted = inference(game, [
+    a,
+    { ...b, value: "no" },
+    { kind: "answer", question: "type-18", value: "no" },
+  ]);
+  const ratios = [...contradicted.weights].map((w, i) => w / game.priors[i]);
+  assert.ok(Math.max(...ratios) / Math.min(...ratios) <= 20 + 1e-10);
+});
+
+test("size and egg questions need a strong late advantage, are capped, and stop after unknown", () => {
+  const regular = {
+    id: "regular",
+    group: "type",
+    values: Int8Array.of(0, 1),
+    error: 0.05,
+    ease: 1,
+    after: 0,
+    expert: false,
+  };
+  const expert = {
+    ...regular,
+    id: "expert",
+    group: "size",
+    expert: true,
+    error: 0.12,
+    ease: 0.6,
+    after: 16,
+  };
+  const tiny = { questions: [regular, expert] },
+    state = {
+      ...inference(game, []),
+      weights: Float64Array.of(0.5, 0.5),
+      answered: 16,
+    };
+  assert.equal(nextQuestion(tiny, state, "test").id, "regular");
+  regular.values = Int8Array.of(1, 1);
+  assert.equal(nextQuestion(tiny, state, "test").id, "expert");
+  for (const extra of [
+    { answered: 15 },
+    { expertAnswers: 2 },
+    { expertUnknown: true },
+    { weights: Float64Array.of(0.995, 0.005) },
+  ])
+    assert.equal(nextQuestion(tiny, { ...state, ...extra }, "test"), null);
+  const unknown = inference(game, [
+    { kind: "answer", question: "height-10", value: "unknown" },
+  ]);
+  assert.equal(unknown.expertUnknown, true);
+  assert.equal(unknown.expertAnswers, 1);
+});
+
+test("a low-confidence final guess uses all remaining attempts without demanding more questions", () => {
+  const r = newRound(game, "uncertain"),
+    questions = game.questions.slice(0, MAX_QUESTIONS);
+  r.events = questions.map((q, i) => ({
+    kind: "answer",
+    question: q.id,
+    value: i < 4 ? "yes" : "unknown",
+  }));
+  assert.ok(viewRound(game, r).guess.weight < 0.3);
+  const rejected = new Set();
+  for (let i = 0; i < 3; i++) {
+    const v = viewRound(game, r);
+    assert.equal(v.kind, "guess");
+    assert.ok(!rejected.has(v.guess.id));
+    rejected.add(v.guess.id);
+    assert.ok(rejectGuess(game, r));
+    assert.deepEqual(restoreRound(JSON.stringify(r), game, "fallback"), r);
+  }
+  assert.equal(viewRound(game, r).kind, "shortlist");
+});
+
+test("Mr Mime recovers from old single-Psychic memories without expert answers", () => {
+  const target = byKey("mr-mime"),
+    index = game.pokemon.indexOf(target);
+  for (let seed = 0; seed < 20; seed++) {
+    const r = newRound(game, `mr-mime-audit-${seed}`);
+    let success = false;
+    for (let step = 0; step < 30; step++) {
+      const v = viewRound(game, r);
+      if (v.kind === "guess") {
+        if (v.guess.id === target.id) {
+          success = true;
+          break;
+        }
+        rejectGuess(game, r);
+      } else if (v.kind === "question") {
+        const q = v.question;
+        answerQuestion(
+          game,
+          r,
+          q.expert
+            ? "unknown"
+            : ["dual-type", "type-18"].includes(q.id)
+              ? "no"
+              : q.values[index] === -1
+                ? "unknown"
+                : q.values[index]
+                  ? "yes"
+                  : "no",
+        );
+      } else break;
+    }
+    assert.ok(success, r.id);
+  }
+});
+
 test("honest sample play converges without answer-name questions, including Mega and regional targets", () => {
   for (const key of [
     "bulbasaur",
@@ -164,6 +290,7 @@ test("honest sample play converges without answer-name questions, including Mega
     assert.equal(view.kind, "guess", key);
     assert.equal(view.guess.id, target.id, key);
     assert.ok(view.answered <= MAX_QUESTIONS);
+    assert.ok(view.expertAnswers <= 2);
     assert.ok(finishRound(game, round));
     assert.equal(round.result.outcome, "guessed");
     assert.equal(answerQuestion(game, round, "yes"), false);

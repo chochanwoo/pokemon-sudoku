@@ -292,6 +292,121 @@ test("new-round confirmation preserves or replaces only this game's progress", a
   ).not.toBe(saved);
 });
 
+test("uncertain final guesses stay tentative and can use all three attempts", async ({
+  page,
+}) => {
+  await page.goto("./pokinator.html");
+  await expect(page.locator("#pn-prompt")).toBeVisible();
+  const r = newRound(game, "uncertain");
+  r.events = game.questions.slice(0, 25).map((q, i) => ({
+    kind: "answer",
+    question: q.id,
+    value: i < 4 ? "yes" : "unknown",
+  }));
+  await seed(page, r);
+  await expect(page.locator(".pn-kicker")).toHaveText("가장 유력한 후보예요");
+  await page.locator("[data-language-select]").selectOption("en");
+  await expect(page.locator(".pn-kicker")).toHaveText("This is my best guess");
+  const names = new Set();
+  for (let i = 0; i < 3; i++) {
+    await expect(page.locator(".pn-guess")).toBeVisible();
+    const guess = await page.locator(".pn-character").innerText();
+    expect(names.has(guess)).toBe(false);
+    names.add(guess);
+    await page.locator('[data-action="reject"]').click();
+    await page.reload();
+  }
+  await expect(page.locator(".pn-shortlist")).toBeVisible();
+  await expect(page.locator(".pn-counter strong")).toHaveText("25");
+});
+
+test("question updates reset only incompatible progress and retain completed records", async ({
+  page,
+}) => {
+  await page.goto("./pokinator.html");
+  await expect(page.locator("#pn-prompt")).toBeVisible();
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "pokinator:records",
+      JSON.stringify([
+        {
+          id: "finished",
+          day: "2026-09-14",
+          answerId: 122,
+          questions: 24,
+          outcome: "guessed",
+        },
+      ]),
+    );
+    localStorage.setItem("other-game", "untouched");
+  });
+  await seed(page, {
+    ...newRound(game, "old"),
+    version: "pokinator-v1",
+    dataVersion: "old-data",
+    events: [{ kind: "answer", question: "gen-until-1", value: "yes" }],
+  });
+  await expect(page.locator("#pn-updated")).toContainText(
+    "완료한 기록은 유지됩니다.",
+  );
+  await expect(page.locator(".pn-counter strong")).toHaveText("0");
+  await page.locator("[data-language-select]").selectOption("en");
+  await expect(page.locator("#pn-updated")).toContainText(
+    "completed records are kept",
+  );
+  await page.locator('[data-action="stats"]').click();
+  await expect(page.locator(".pn-records > div")).toHaveCount(1);
+  await expect(page.locator(".pn-records")).toContainText("Mr. Mime");
+  await page.keyboard.press("Escape");
+  await page.locator('[data-action="new"]').click();
+  await expect(page.locator("#pn-updated")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("other-game"))).toBe(
+    "untouched",
+  );
+});
+
+test("long game-title debut questions fit both languages and mobile sizes", async ({
+  page,
+}) => {
+  const q = data.questions.find((q) => q.id === "debut-scarlet-violet");
+  await page.route("**/pokinator.json", (route) =>
+    route.fulfill({ json: { ...data, questions: [q] } }),
+  );
+  await page.goto("./pokinator.html");
+  await expect(page.locator("#pn-prompt")).toContainText("최초로 등장했나요?");
+  await expect(page.locator("#pn-prompt")).not.toContainText("메가");
+  await expect(page.locator("#pn-question-note")).toContainText(
+    "추가 콘텐츠 포함",
+  );
+  for (const language of ["ko", "en"]) {
+    await page.locator("[data-language-select]").selectOption(language);
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(
+        await page.locator("#pn-prompt").evaluate((el) => {
+          const rect = el.getBoundingClientRect(),
+            note = document
+              .querySelector("#pn-question-note")
+              .getBoundingClientRect(),
+            buttons = document
+              .querySelector(".pn-answer-buttons")
+              .getBoundingClientRect();
+          return (
+            document.documentElement.scrollWidth <= innerWidth &&
+            el.scrollWidth <= el.clientWidth &&
+            rect.bottom <= note.top &&
+            note.bottom <= buttons.top
+          );
+        }),
+      ).toBe(true);
+      await page.screenshot({
+        path: `.preview/pokinator-debut-${language}-${width}.png`,
+        fullPage: true,
+      });
+    }
+  }
+});
+
 test("question, guess, shortlist, result and help fit mobile and desktop in both languages with nonblank sprites", async ({
   page,
 }) => {

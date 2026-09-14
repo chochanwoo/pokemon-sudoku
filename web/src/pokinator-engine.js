@@ -4,6 +4,7 @@ import { searchForms } from "./similarity-engine.js";
 
 export const MAX_QUESTIONS = 25;
 export const MAX_GUESSES = 3;
+export const MAX_EXPERT_QUESTIONS = 2;
 export const STORAGE_KEY = "pokinator:round";
 export const ANSWERS = ["yes", "no", "unknown"];
 const normalize = (values) => {
@@ -16,7 +17,7 @@ const entropy = (p) =>
 
 export function createPokinator(catalog, data) {
   if (
-    data.version !== "pokinator-v1" ||
+    data.version !== "pokinator-v2" ||
     data.policy !== "base-regional-mega-v1" ||
     data.catalogVersion !== catalog.version ||
     typeof data.dataVersion !== "string" ||
@@ -68,7 +69,12 @@ export function createPokinator(catalog, data) {
       q.ease > 2 ||
       !Number.isInteger(q.after) ||
       q.after < 0 ||
-      q.after >= MAX_QUESTIONS
+      q.after >= MAX_QUESTIONS ||
+      typeof q.expert !== "boolean" ||
+      (q.note !== undefined &&
+        (!q.note ||
+          typeof q.note.ko !== "string" ||
+          typeof q.note.en !== "string"))
     )
       throw new Error("Invalid question");
     return {
@@ -179,44 +185,32 @@ export function restoreRound(raw, game, fallbackId) {
 export function inference(game, events) {
   let weights = game.priors.slice();
   const groups = new Map(),
+    evidenceGroups = new Map(),
     unknownGroups = new Map(),
     asked = new Set(),
     rejected = new Set();
   let answered = 0,
     known = 0,
     lastPause = -10,
-    continued = false;
+    continued = false,
+    expertAnswers = 0,
+    expertUnknown = false;
   for (const e of events) {
     if (e.kind === "answer") {
       const q = game.questionById.get(e.question);
       asked.add(q.id);
       answered++;
+      if (q.expert) {
+        expertAnswers++;
+        if (e.value === "unknown") expertUnknown = true;
+      }
       if (e.value === "unknown") {
         unknownGroups.set(q.group, (unknownGroups.get(q.group) || 0) + 1);
         continue;
       }
       known++;
-      // Temper correlated evidence, e.g. several generation or type questions.
-      const strength = 1 / Math.sqrt(1 + 0.6 * (groups.get(q.group) || 0));
-      const match = (1 - q.error) ** strength,
-        miss = q.error ** strength;
-      const yes = e.value === "yes" ? 1 : 0;
-      let mass = 0,
-        evidence = 0;
-      for (let i = 0; i < weights.length; i++)
-        if (q.values[i] !== -1) {
-          mass += weights[i];
-          evidence += weights[i] * (q.values[i] === yes ? match : miss);
-        }
-      // Missing DB facts retain their mass instead of being treated as false.
-      const neutral = mass > 0 ? evidence / mass : 1;
-      weights = normalize(
-        weights.map(
-          (w, i) =>
-            w *
-            (q.values[i] === -1 ? neutral : q.values[i] === yes ? match : miss),
-        ),
-      );
+      if (!evidenceGroups.has(q.group)) evidenceGroups.set(q.group, []);
+      evidenceGroups.get(q.group).push({ q, yes: e.value === "yes" ? 1 : 0 });
       groups.set(q.group, (groups.get(q.group) || 0) + 1);
     } else if (e.kind === "reject") {
       rejected.add(e.id);
@@ -229,6 +223,43 @@ export function inference(game, events) {
       continued = true;
     }
   }
+  for (const [, answers] of [...evidenceGroups].sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    const factors = new Float64Array(weights.length).fill(1),
+      facts = new Uint8Array(weights.length);
+    for (const { q, yes } of answers) {
+      const miss = q.error / (1 - q.error);
+      let mass = 0,
+        evidence = 0;
+      for (let i = 0; i < weights.length; i++) {
+        if (q.values[i] === -1) continue;
+        mass += weights[i];
+        evidence += weights[i] * (q.values[i] === yes ? 1 : miss);
+      }
+      const neutral = mass > 0 ? evidence / mass : 1;
+      for (let i = 0; i < weights.length; i++) {
+        if (q.values[i] !== -1) facts[i]++;
+        factors[i] *=
+          q.values[i] === -1 ? neutral : q.values[i] === yes ? 1 : miss;
+      }
+    }
+    // A whole category can reflect one mistaken memory (e.g. old typings).
+    // Mix in a small uninformative component, capping its penalty at 20:1.
+    let mass = 0,
+      evidence = 0;
+    for (let i = 0; i < weights.length; i++) {
+      factors[i] = 0.05 + 0.95 * factors[i];
+      if (facts[i]) {
+        mass += weights[i];
+        evidence += weights[i] * factors[i];
+      }
+    }
+    const neutral = mass > 0 ? evidence / mass : 1;
+    weights = normalize(
+      weights.map((w, i) => w * (facts[i] ? factors[i] : neutral)),
+    );
+  }
   return {
     weights,
     groups,
@@ -239,14 +270,25 @@ export function inference(game, events) {
     known,
     lastPause,
     continued,
+    expertAnswers,
+    expertUnknown,
   };
 }
 
 export function nextQuestion(game, state, seed) {
   let best = null,
-    bestScore = 0;
+    bestScore = 0,
+    expert = null,
+    expertScore = 0;
   for (const q of game.questions) {
     if (state.asked.has(q.id) || q.after > state.answered) continue;
+    if (
+      q.expert &&
+      (state.answered < 16 ||
+        state.expertUnknown ||
+        state.expertAnswers >= MAX_EXPERT_QUESTIONS)
+    )
+      continue;
     let knownMass = 0,
       yesMass = 0;
     for (let i = 0; i < state.weights.length; i++)
@@ -261,11 +303,18 @@ export function nextQuestion(game, state, seed) {
       ((gain * q.ease) / Math.sqrt(1 + (state.groups.get(q.group) || 0))) *
       0.55 ** (state.unknownGroups.get(q.group) || 0) *
       (1 + (hash(`${seed}:${q.id}`) % 100) / 2000);
-    if (score > bestScore + 1e-12) {
+    if (q.expert) {
+      // Reserve unfamiliar trivia for a substantially better late tiebreaker.
+      if (gain >= 0.25 && score > expertScore + 1e-12) {
+        expert = q;
+        expertScore = score;
+      }
+    } else if (score > bestScore + 1e-12) {
       best = q;
       bestScore = score;
     }
   }
+  if (expert && expertScore > bestScore * 2) return expert;
   return bestScore > 1e-8 ? best : null;
 }
 
@@ -282,8 +331,8 @@ export function viewRound(game, round) {
     state.rejected.size >= MAX_GUESSES;
   const canGuess =
     state.known >= 4 &&
-    state.answered - state.lastPause >= 2 &&
-    (ranking[0].weight >= 0.78 || (!canAsk && ranking[0].weight >= 0.3));
+    (!canAsk ||
+      (state.answered - state.lastPause >= 2 && ranking[0].weight >= 0.78));
   const kind = round.result
     ? "complete"
     : shortlist

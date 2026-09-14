@@ -41,6 +41,31 @@ class PokinatorBuilderTests(unittest.TestCase):
                     if p["kind"] != "base":
                         self.assertEqual(value, "?", p["key"])
 
+    def test_debut_questions_use_actual_games_not_generation_cutoffs(self):
+        questions = [q for q in self.data["questions"] if q["group"] == "generation"]
+        by_key = {p["key"]: i for i, p in enumerate(self.data["pokemon"])}
+        by_id = {q["id"]: q for q in questions}
+        for p in self.data["pokemon"]:
+            self.assertEqual(sum(q["values"][by_key[p["key"]]] == "1" for q in questions), 1, p["key"])
+        for pokemon, game in [("piplup", "diamond-pearl"), ("mothim", "diamond-pearl"),
+                              ("charizard-mega-x", "red-green-japan"), ("growlithe-hisui", "legends-arceus"),
+                              ("vulpix-alola", "sun-moon"), ("zeraora", "ultra-sun-ultra-moon"),
+                              ("meltan", "lets-go-pikachu-lets-go-eevee"), ("ogerpon", "scarlet-violet")]:
+            self.assertEqual(by_id[f"debut-{game}"]["values"][by_key[pokemon]], "1", pokemon)
+        for q in questions:
+            self.assertIn("최초로 등장했나요?", q["ko"])
+            self.assertNotIn("세대", q["ko"])
+            self.assertIn("first appear", q["en"])
+            self.assertTrue(q["note"]["ko"] and q["note"]["en"])
+
+    def test_evolution_copy_and_expert_question_policy(self):
+        by_id = {q["id"]: q for q in self.data["questions"]}
+        self.assertEqual(by_id["evolved"]["ko"], "진화체인가요?")
+        for q in self.data["questions"]:
+            self.assertEqual(q["expert"], q["group"] in {"size", "eggs"})
+            if q["expert"]:
+                self.assertGreaterEqual(q["after"], 16)
+
 
 if __name__ == "__main__":
     unittest.main()

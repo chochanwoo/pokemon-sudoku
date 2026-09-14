@@ -12,6 +12,9 @@ export default {
   아니오: "No",
   모르겠습니다: "I don't know",
   "단서가 모였어요": "I have a hunch",
+  "가장 유력한 후보예요": "This is my best guess",
+  "질문이 업데이트되어 새 문답을 시작했어요. 완료한 기록은 유지됩니다.":
+    "The questions have been updated, so a new round has started. Your completed records are kept.",
   "혹시 {pokemon}인가요?": "Is it {pokemon}?",
   "맞아요!": "That's right!",
   아니에요: "No, it's not",

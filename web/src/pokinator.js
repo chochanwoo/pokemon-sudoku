@@ -77,7 +77,8 @@ let catalog,
   historyOpen = false,
   query = "",
   limit = 20,
-  storageWarning = false;
+  storageWarning = false,
+  roundUpdated = false;
 const name = (p) => (getLanguage() === "en" ? p.english : p.name);
 const questionText = (q) => (getLanguage() === "en" ? q.en : q.ko);
 const refreshIcons = () =>
@@ -150,7 +151,7 @@ function portraitPanel() {
 }
 function stage() {
   if (view.kind === "question")
-    return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("마음속의 포켓몬은…")}</p><h2 id="pn-prompt" tabindex="-1" data-question="${view.question.id}">${esc(questionText(view.question))}</h2><div class="pn-answer-buttons">${Object.keys(
+    return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("마음속의 포켓몬은…")}</p><h2 id="pn-prompt" tabindex="-1" data-question="${view.question.id}" ${view.question.note ? 'aria-describedby="pn-question-note"' : ""}>${esc(questionText(view.question))}</h2>${view.question.note ? `<p id="pn-question-note">${esc(view.question.note[getLanguage()])}</p>` : ""}<div class="pn-answer-buttons">${Object.keys(
       answerLabels,
     )
       .map(
@@ -159,7 +160,7 @@ function stage() {
       )
       .join("")}</div></div>`;
   if (view.kind === "guess")
-    return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("단서가 모였어요")}</p><h2 id="pn-prompt" tabindex="-1">${t("혹시 {pokemon}인가요?", { pokemon: esc(name(view.guess)) })}</h2><div class="pn-answer-buttons pn-confirm-buttons"><button class="pn-answer pn-yes" data-action="confirm">${icon("check")}${t("맞아요!")}</button><button class="pn-answer pn-no" data-action="reject">${icon("x")}${t("아니에요")}</button></div>${view.canAsk && !view.continued ? `<button class="text-button pn-continue" data-action="continue">${icon("circle-help")}${t("질문 더 해보기")}</button>` : ""}</div>`;
+    return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t(view.guess.weight < 0.78 ? "가장 유력한 후보예요" : "단서가 모였어요")}</p><h2 id="pn-prompt" tabindex="-1">${t("혹시 {pokemon}인가요?", { pokemon: esc(name(view.guess)) })}</h2><div class="pn-answer-buttons pn-confirm-buttons"><button class="pn-answer pn-yes" data-action="confirm">${icon("check")}${t("맞아요!")}</button><button class="pn-answer pn-no" data-action="reject">${icon("x")}${t("아니에요")}</button></div>${view.canAsk && !view.continued ? `<button class="text-button pn-continue" data-action="continue">${icon("circle-help")}${t("질문 더 해보기")}</button>` : ""}</div>`;
   if (view.kind === "shortlist")
     return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("마지막 확인")}</p><h2 id="pn-prompt" tabindex="-1">${t("아직 확신하기 어려워요.")}</h2><p class="pn-result-copy">${t("생각한 포켓몬은 누구였나요?")}</p><label class="pn-search">${icon("search")}<input id="pn-search" type="search" aria-label="${t("포켓몬 이름 또는 도감 번호")}" placeholder="${t("이름 또는 도감 번호")}" value="${esc(query)}" autocomplete="off" /></label></div><div class="pn-candidates-area"><ul id="pn-candidates" aria-label="${t("마지막 후보")}"></ul><button id="pn-more" class="text-button" data-action="more" hidden>${icon("chevron-down")}${t("더 보기")}</button></div>`;
   const success = round.result.outcome === "guessed";
@@ -171,6 +172,7 @@ function render(focus = false) {
     <main class="main pn-main"><section class="pn-heading"><div><p class="eyebrow">${icon("brain")}${t("역방향 추리")}</p><h1>${t("포키네이터")}</h1></div><span class="pn-counter">${t("문답")} <strong>${view.answered}</strong><span>/ ${MAX_QUESTIONS}</span></span></section>
     <div class="pn-progress" role="progressbar" aria-label="${t("진행한 질문")}" aria-valuemin="0" aria-valuemax="${MAX_QUESTIONS}" aria-valuenow="${view.answered}"><span style="width:${(view.answered / MAX_QUESTIONS) * 100}%"></span></div>
     <p id="pn-save-warning" class="pn-warning" role="status" ${storageWarning ? "" : "hidden"}>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
+    ${roundUpdated ? `<p class="pn-warning" id="pn-updated" role="status">${t("질문이 업데이트되어 새 문답을 시작했어요. 완료한 기록은 유지됩니다.")}</p>` : ""}
     <section id="pn-stage" class="pn-stage pn-${view.kind}" aria-labelledby="pn-prompt">${stage()}</section>
     <div class="pn-tools">${tool("undo", "이전 답변으로", "undo-2", !round.events.length || !!round.result)}<span></span>${view.kind === "question" || view.kind === "guess" ? `<button class="text-button" data-action="stop">${icon("eye")}${t("여기까지 추리하기")}</button>` : ""}${view.kind !== "complete" ? tool("new", "새 포켓몬으로 도전", "rotate-cw") : ""}</div>
     <details id="pn-history" ${historyOpen ? "open" : ""}><summary><span>${t("문답 기록")} <b>${view.answered}</b></span>${icon("chevron-down")}</summary><ol class="pn-history-list">${round.events.map((e, index) => (e.kind === "answer" ? `<li><span class="pn-history-question">${esc(questionText(game.questionById.get(e.question)))}</span><span class="pn-history-answer pn-${e.value}">${icon(answerIcons[e.value])}${t(answerLabels[e.value])}</span>${!round.result ? `<button class="icon-button" data-rewind="${index}" aria-label="${esc(t("{question} — 이 답변부터 다시", { question: questionText(game.questionById.get(e.question)) }))}" data-tooltip="${t("이 답변부터 다시")}">${icon("undo-2")}</button>` : ""}</li>` : e.kind === "reject" ? `<li class="pn-rejected"><span>${t("{pokemon} 추측", { pokemon: esc(name(game.byId.get(e.id))) })}</span><span>${t("아니에요")}</span></li>` : "")).join("") || `<li class="pn-empty">${t("아직 답변한 질문이 없어요.")}</li>`}</ol></details>
@@ -242,6 +244,7 @@ function showDialog(state) {
 }
 function restart() {
   dialogState = null;
+  roundUpdated = false;
   round = newRound(game, crypto.randomUUID());
   historyOpen = false;
   query = "";
@@ -330,7 +333,17 @@ async function boot() {
     });
     if (!questions.ok) throw new Error("Question loading failed");
     game = createPokinator(catalog, await questions.json());
-    round = restoreRound(read(STORAGE_KEY), game, crypto.randomUUID());
+    const saved = read(STORAGE_KEY);
+    round = restoreRound(saved, game, crypto.randomUUID());
+    try {
+      const previous = JSON.parse(saved);
+      roundUpdated =
+        previous?.version?.startsWith("pokinator-") &&
+        previous.dataVersion !== game.dataVersion &&
+        previous.id !== round.id;
+    } catch {
+      /* Invalid saves already fall back to a new round. */
+    }
     save(STORAGE_KEY, round);
     render();
   } catch (e) {
