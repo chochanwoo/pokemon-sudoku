@@ -19,6 +19,8 @@ with ZipFile(target) as archive:
     assert "pokeclue.json" in archive.namelist()
     assert "highlow.html" in archive.namelist()
     assert "highlow.json" in archive.namelist()
+    assert "pokinator.html" in archive.namelist()
+    assert "pokinator.json" in archive.namelist()
     assert "pokemantle-scores.bin" in archive.namelist()
     assert ".nojekyll" in archive.namelist()
     assert not any(name.startswith(("data/", "node_modules/", ".tools/")) for name in archive.namelist())

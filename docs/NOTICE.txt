@@ -19,6 +19,11 @@ Route 229 trainer names and localization references:
 https://pokemon.fandom.com/ko/wiki/229%EB%B2%88%EB%8F%84%EB%A1%9C
 https://bulbapedia.bulbagarden.net/wiki/Sinnoh_Route_229
 These are game sprites, not original artwork created for this project.
+Pokinator reuses the unchanged Pokemon sprites from the shared local catalog.
+Its homepage previews are screenshots of the actual game, in Korean and English.
+Pokinator's separate base/regional/Mega answer pool and question matrix are built
+from the read-only PokeAPI-derived database by scripts/build_pokinator.py.
+Species-level appearance is intentionally unknown for regional and Mega forms.
 Original character and sprite rights remain with Nintendo, Creatures and
 GAME FREAK; the hosting project does not grant rights to Pokemon artwork.
 

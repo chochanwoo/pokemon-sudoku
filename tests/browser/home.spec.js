@@ -8,6 +8,7 @@ test("every page shares the same home brand and game logos return to the library
   let reference;
   for (const [name, path, title] of [
     ["home", "./", "포켓몬 퀴즈"],
+    ["pokinator", "./pokinator.html", "포키네이터 | 포켓몬 퀴즈"],
     [
       "sudoku",
       "./sudoku.html?size=4&level=easy&seed=free:brand",

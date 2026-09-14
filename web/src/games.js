@@ -6,6 +6,8 @@ import pokecluePreview from "./assets/pokeclue-preview.png";
 import pokecluePreviewEn from "./assets/pokeclue-preview-en.png";
 import highlowPreview from "./assets/highlow-preview.png";
 import highlowPreviewEn from "./assets/highlow-preview-en.png";
+import pokinatorPreview from "./assets/pokinator-preview.png";
+import pokinatorPreviewEn from "./assets/pokinator-preview-en.png";
 
 export const games = [
   {
@@ -47,5 +49,15 @@ export const games = [
     image: highlowPreview,
     imageEn: highlowPreviewEn,
     imageAlt: "두 포켓몬의 종족값을 비교하는 포케 하이로우 대결",
+  },
+  {
+    id: "pokinator",
+    title: "포키네이터",
+    category: "역방향 추리",
+    formats: "자유 플레이",
+    href: "./pokinator.html",
+    image: pokinatorPreview,
+    imageEn: pokinatorPreviewEn,
+    imageAlt: "포키네이터의 질문에 예, 아니오, 모르겠습니다로 답하는 화면",
   },
 ];
