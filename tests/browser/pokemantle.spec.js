@@ -503,7 +503,7 @@ test("new weights rescore existing guesses without changing today's answer, and 
   const help = page.locator("#pm-dialog-body");
   await expect(help.getByRole("listitem")).toHaveCount(5);
   for (const rule of [
-    "정확한 모습",
+    "외형만 다른 모습은 하나로 합칩니다",
     "100점, 1위",
     "최대 3번",
     "한국 시간 자정",

@@ -266,8 +266,13 @@ function start(day) {
   clearTimeout(toastTimer);
   document.querySelector("#pm-toast").textContent = "";
   document.querySelector("#pm-toast").classList.remove("visible");
-  round = restoreRound(stored(`${data.version}:${day}`), data, day);
+  const saved = stored(`${data.version}:${day}`);
+  round = restoreRound(saved, data, day);
   target = dailyTarget(data, day);
+  if (saved && saved !== JSON.stringify(round)) {
+    persist(roundKey(), round);
+    if (ended()) saveRecord();
+  }
   ranked = game.ranking(target);
   rankById = new Map(ranked.map((row) => [row.id, row]));
   resultsView = "history";
@@ -670,7 +675,7 @@ function onClick(event) {
     case "help":
       dialog(
         "포맨틀 규칙",
-        `<ul class="rules"><li>${t("하루에 한 포켓몬의 <strong>정확한 모습</strong>을 맞힙니다. 리전 폼·메가진화 등은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("정답을 맞히기까지 사용한 횟수로 트레이너 등급을 받습니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>${trainerGuide()}`,
+        `<ul class="rules"><li>${t("하루에 한 포켓몬을 맞힙니다. 무늬·색상 등 외형만 다른 모습은 하나로 합칩니다. 리전 폼·메가진화 등 전투 특성이 다른 모습은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("정답을 맞히기까지 사용한 횟수로 트레이너 등급을 받습니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>${trainerGuide()}`,
       );
       break;
     case "stats": {
