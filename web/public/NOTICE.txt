@@ -20,6 +20,9 @@ https://pokemon.fandom.com/ko/wiki/229%EB%B2%88%EB%8F%84%EB%A1%9C
 https://bulbapedia.bulbagarden.net/wiki/Sinnoh_Route_229
 These are game sprites, not original artwork created for this project.
 Pokinator reuses the unchanged Pokemon sprites from the shared local catalog.
+Poke Scratch uses the same unchanged sprites. scripts/build_scratch.py reads
+their alpha bounds and pixel identities for cropped rendering and fair scoring;
+no source artwork is altered. Its hub previews show the actual game.
 Its homepage previews are screenshots of the actual game, in Korean and English.
 Pokinator's separate base/regional/Mega answer pool and question matrix are built
 from the read-only PokeAPI-derived database by scripts/build_pokinator.py.

@@ -9,6 +9,7 @@ test("every page shares the same home brand and game logos return to the library
   for (const [name, path, title] of [
     ["home", "./", "포켓몬 퀴즈"],
     ["pokinator", "./pokinator.html", "포키네이터 | 포켓몬 퀴즈"],
+    ["scratch", "./scratch.html", "포케 스크래치 | 포켓몬 퀴즈"],
     [
       "sudoku",
       "./sudoku.html?size=4&level=easy&seed=free:brand",

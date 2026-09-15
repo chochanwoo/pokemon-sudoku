@@ -22,6 +22,7 @@ export default defineConfig({
           new URL("./web/pokeclue.html", import.meta.url),
         ),
         highlow: fileURLToPath(new URL("./web/highlow.html", import.meta.url)),
+        scratch: fileURLToPath(new URL("./web/scratch.html", import.meta.url)),
         pokinator: fileURLToPath(
           new URL("./web/pokinator.html", import.meta.url),
         ),
@@ -56,6 +57,7 @@ export default defineConfig({
           "pokemantle-scores.bin",
           "pokeclue.json",
           "highlow.json",
+          "scratch.json",
           "pokinator.json",
           "NOTICE.txt",
           ".nojekyll",

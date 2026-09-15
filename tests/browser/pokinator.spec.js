@@ -122,7 +122,7 @@ test("the fifth hub game has real bilingual previews and the shared brand return
   page,
 }) => {
   await page.goto("./");
-  await expect(page.locator(".game-card")).toHaveCount(5);
+  await expect(page.locator(".game-card")).toHaveCount(6);
   const card = page.locator('.game-card[href="./pokinator.html"]');
   await expect(card.locator("h2")).toHaveText("포키네이터");
   const ko = await card.locator("img").getAttribute("src");

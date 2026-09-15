@@ -21,6 +21,8 @@ with ZipFile(target) as archive:
     assert "highlow.json" in archive.namelist()
     assert "pokinator.html" in archive.namelist()
     assert "pokinator.json" in archive.namelist()
+    assert "scratch.html" in archive.namelist()
+    assert "scratch.json" in archive.namelist()
     assert "pokemantle-scores.bin" in archive.namelist()
     assert ".nojekyll" in archive.namelist()
     assert not any(name.startswith(("data/", "node_modules/", ".tools/")) for name in archive.namelist())

@@ -8,6 +8,8 @@ import highlowPreview from "./assets/highlow-preview.png";
 import highlowPreviewEn from "./assets/highlow-preview-en.png";
 import pokinatorPreview from "./assets/pokinator-preview.png";
 import pokinatorPreviewEn from "./assets/pokinator-preview-en.png";
+import scratchPreview from "./assets/scratch-preview.png";
+import scratchPreviewEn from "./assets/scratch-preview-en.png";
 
 export const games = [
   {
@@ -59,5 +61,15 @@ export const games = [
     image: pokinatorPreview,
     imageEn: pokinatorPreviewEn,
     imageAlt: "포키네이터의 질문에 예, 아니오, 모르겠습니다로 답하는 화면",
+  },
+  {
+    id: "scratch",
+    title: "포케 스크래치",
+    category: "그림 추리",
+    formats: "데일리 · 연습",
+    href: "./scratch.html",
+    image: scratchPreview,
+    imageEn: scratchPreviewEn,
+    imageAlt: "일부를 지운 가림막 아래 포켓몬을 추측하는 포케 스크래치 화면",
   },
 ];

@@ -69,7 +69,7 @@ test("High Low is the fourth localized hub game and runs under a nested Pages pa
   page.on("request", (r) => requests.push(r.url()));
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("./");
-  await expect(page.locator(".game-card")).toHaveCount(5);
+  await expect(page.locator(".game-card")).toHaveCount(6);
   const card = page.getByRole("link", {
     name: "포케 하이로우 플레이",
     exact: true,

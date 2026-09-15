@@ -7,10 +7,11 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test tests/engine.test.js tests/similarity.test.js tests/i18n.test.js tests/clue.test.js tests/highlow.test.js tests/trainers.test.js tests/pokinator.test.js",
+    "test": "node --test tests/engine.test.js tests/similarity.test.js tests/i18n.test.js tests/clue.test.js tests/highlow.test.js tests/trainers.test.js tests/pokinator.test.js tests/scratch.test.js",
     "build:clues": "python scripts/build_pokeclue.py",
     "build:highlow": "python scripts/build_highlow.py",
     "build:pokinator": "python scripts/build_pokinator.py",
+    "build:scratch": "python scripts/build_scratch.py",
     "test:e2e": "playwright test"
   },
   "dependencies": {

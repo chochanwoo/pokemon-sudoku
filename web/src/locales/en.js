@@ -1,5 +1,51 @@
 // Korean source messages are the default locale and the translation keys.
 export default {
+  "포케 스크래치": "Poke Scratch",
+  "포케 스크래치 | 포켓몬 퀴즈": "Poke Scratch | Pokemon Quiz",
+  "포케 스크래치 규칙": "Poke Scratch rules",
+  "그림 추리": "Picture guessing",
+  "일부를 지운 가림막 아래 포켓몬을 추측하는 포케 스크래치 화면":
+    "Guessing a Pokemon beneath a partly erased cover in Poke Scratch",
+  "새로운 오늘의 그림이 열렸어요.": "New daily pictures are ready.",
+  "문제 진행": "Round progress",
+  "{count}번째 그림": "Picture {count}",
+  합계: "Total",
+  "스크래치 보드": "Scratch board",
+  "그림을 불러오지 못했어요.": "Could not load the picture.",
+  "지우개 크기": "Eraser size",
+  "어떤 포켓몬일까요?": "Which Pokemon is it?",
+  "현재 점수": "Current score",
+  "획득 점수": "Points earned",
+  "지운 면적": "Area erased",
+  점: "pt",
+  "검색 결과": "Search results",
+  "정답이에요!": "Correct!",
+  "이번 그림은 넘겼어요.": "Picture skipped.",
+  "다음 그림": "Next picture",
+  "도전 결과": "Round results",
+  "공개 {percent}% · 오답 {count}회":
+    "{percent}% revealed · {count} wrong guesses",
+  "목록에서 포켓몬을 선택해 주세요.": "Choose a Pokemon from the list.",
+  "이미 추측한 포켓몬이에요.": "You already guessed this Pokemon.",
+  "아니에요. 오답 1회, 5점 감점!":
+    "Not this one. One wrong guess, minus 5 points!",
+  "정답을 공개할까요?": "Reveal the answer?",
+  "이 그림은 0점으로 마무리하고 다음 그림으로 넘어갈 수 있어요.":
+    "This picture earns 0 points. You can then move on to the next picture.",
+  "가림막을 직접 지우며 포켓몬을 맞혀 보세요. 마우스나 손가락으로 문지르거나, 보드에 초점을 둔 뒤 방향키로 이동하고 Space 또는 Enter로 지울 수 있어요.":
+    "Erase the cover and identify the Pokemon. Drag with a mouse or finger, or focus the board, move with arrow keys and erase with Space or Enter.",
+  "점수는 100점에서 지운 면적 비율과 오답당 5점을 뺍니다. 맞히면 최소 10점, 정답을 공개하면 0점이에요. 시간 감점은 없어요.":
+    "Start at 100 points, subtract the percentage erased and 5 per wrong guess. Correct answers earn at least 10 points; revealing the answer earns 0. There is no time penalty.",
+  "빈 여백을 잘라낸 그림 영역만 계산하며, 같은 곳을 다시 지워도 추가 감점은 없어요. 지운 부분은 새로고침해도 유지돼요.":
+    "Only the tightly cropped picture area counts. Erasing the same spot costs nothing extra, and erased areas survive a reload.",
+  "한 세트는 5문제, 총 500점입니다. 기본 모습·리전폼·메가진화가 등장하며, 같은 그림을 쓰는 모습은 같은 정답으로 인정해요.":
+    "Each set has 5 pictures for up to 500 points. Base Pokemon, regional forms and Mega Evolutions are included. Forms using identical artwork count as the same answer.",
+  "데일리는 한국 시간 자정에 바뀌며, 연습과 진행 기록을 따로 저장해요.":
+    "Daily pictures change at midnight in Korea (UTC+9). Practice and daily progress are saved separately.",
+  "{min}~{max}점": "{min}-{max} points",
+  "{count}마리 정답": "{count} Pokemon identified",
+  "최고 {score}점": "Best: {score} points",
+  "오늘의 그림을 준비하고 있어요": "Preparing today's pictures",
   포키네이터: "Pokinator",
   취소: "Cancel",
   "포키네이터 | 포켓몬 퀴즈": "Pokinator | Pokemon Quiz",

@@ -45,8 +45,8 @@ test("the new hub card has real localized previews and both navigation direction
   page,
 }) => {
   await page.goto("./");
-  await expect(page.locator(".game-card")).toHaveCount(5);
-  await expect(page.locator(".hub-heading > span")).toHaveText("5개 게임");
+  await expect(page.locator(".game-card")).toHaveCount(6);
+  await expect(page.locator(".hub-heading > span")).toHaveText("6개 게임");
   const card = page.getByRole("link", { name: "포케클루 플레이", exact: true });
   await expect(card).toHaveAttribute("href", "./pokeclue.html");
   await expect(card.locator(".game-formats")).toHaveText("데일리 · 연습");
