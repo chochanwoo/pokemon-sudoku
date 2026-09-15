@@ -77,6 +77,7 @@ let catalog,
   historyOpen = false,
   query = "",
   limit = 20,
+  noteController,
   storageWarning = false,
   roundUpdated = false;
 const name = (p) => (getLanguage() === "en" ? p.english : p.name);
@@ -151,7 +152,7 @@ function portraitPanel() {
 }
 function stage() {
   if (view.kind === "question")
-    return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("마음속의 포켓몬은…")}</p><h2 id="pn-prompt" tabindex="-1" data-question="${view.question.id}" ${view.question.note ? 'aria-describedby="pn-question-note"' : ""}>${esc(questionText(view.question))}</h2>${view.question.note ? `<p id="pn-question-note">${esc(view.question.note[getLanguage()])}</p>` : ""}<div class="pn-answer-buttons">${Object.keys(
+    return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("마음속의 포켓몬은…")}</p><div class="pn-question-heading"><h2 id="pn-prompt" tabindex="-1" data-question="${view.question.id}">${esc(questionText(view.question))}</h2>${view.question.note ? `<span class="pn-note-help"><button id="pn-note-toggle" class="icon-button" type="button" aria-label="${t("질문 부가설명")}" aria-describedby="pn-question-note" aria-controls="pn-question-note" aria-expanded="false">${icon("circle-help")}</button><span id="pn-question-note" role="tooltip" hidden>${esc(view.question.note[getLanguage()])}</span></span>` : ""}</div><div class="pn-answer-buttons">${Object.keys(
       answerLabels,
     )
       .map(
@@ -166,7 +167,79 @@ function stage() {
   const success = round.result.outcome === "guessed";
   return `${portraitPanel()}<div class="pn-question-content"><p class="pn-kicker">${t("추리 완료")}</p><h2 id="pn-prompt" tabindex="-1">${t(success ? "맞혔어요!" : "이번에는 놓쳤네요.")}</h2><p class="pn-result-copy">${t("{count}개의 질문", { count: view.answered })} · ${t("모르겠습니다 {count}회", { count: view.answered - view.known })}</p><div class="pn-result-actions"><button class="primary-button" data-action="share">${icon("share-2")}${t("결과 공유")}</button><button class="text-button" data-action="new">${icon("rotate-cw")}${t("새 포켓몬으로 도전")}</button></div></div>`;
 }
+function bindQuestionNote() {
+  const help = document.querySelector(".pn-note-help");
+  if (!help) return;
+  noteController = new AbortController();
+  const { signal } = noteController,
+    button = help.querySelector("button"),
+    note = help.querySelector('[role="tooltip"]');
+  let pinned = false,
+    timer;
+  const on = (target, event, listener, options = {}) =>
+    target.addEventListener(event, listener, { ...options, signal });
+  const hide = () => {
+    clearTimeout(timer);
+    pinned = false;
+    note.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  };
+  const show = () => {
+    clearTimeout(timer);
+    note.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    const bounds = button.getBoundingClientRect(),
+      width = note.offsetWidth,
+      height = note.offsetHeight,
+      top =
+        bounds.top >= height + 24 ? bounds.top - height - 8 : bounds.bottom + 8;
+    note.style.left = `${Math.max(16, Math.min(innerWidth - width - 16, bounds.right - width))}px`;
+    note.style.top = `${Math.max(16, Math.min(innerHeight - height - 16, top))}px`;
+  };
+  signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  on(help, "pointerenter", (e) => {
+    if (e.pointerType === "mouse") show();
+  });
+  on(help, "pointerleave", (e) => {
+    if (
+      e.pointerType === "mouse" &&
+      !pinned &&
+      !button.matches(":focus-visible")
+    )
+      timer = setTimeout(hide, 150);
+  });
+  on(button, "focus", () => {
+    if (button.matches(":focus-visible")) show();
+  });
+  on(help, "focusout", (e) => {
+    if (!help.contains(e.relatedTarget)) hide();
+  });
+  on(button, "click", () => {
+    pinned = !pinned;
+    if (pinned) show();
+    else hide();
+  });
+  on(document, "pointerdown", (e) => {
+    if (!help.contains(e.target)) hide();
+  });
+  on(document, "keydown", (e) => {
+    if (e.key === "Escape" && !note.hidden) {
+      e.preventDefault();
+      hide();
+    }
+  });
+  on(window, "resize", hide);
+  on(
+    window,
+    "scroll",
+    (e) => {
+      if (!note.contains(e.target)) hide();
+    },
+    { capture: true, passive: true },
+  );
+}
 function render(focus = false) {
+  noteController?.abort();
   view = viewRound(game, round);
   app.innerHTML = `<header class="site-header"><div class="header-inner">${siteBrand()}<nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav></div></header>
     <main class="main pn-main"><section class="pn-heading"><div><p class="eyebrow">${icon("brain")}${t("역방향 추리")}</p><h1>${t("포키네이터")}</h1></div><span class="pn-counter">${t("문답")} <strong>${view.answered}</strong><span>/ ${MAX_QUESTIONS}</span></span></section>
@@ -188,6 +261,7 @@ function render(focus = false) {
   });
   if (dialogState) showDialog(dialogState);
   refreshIcons();
+  bindQuestionNote();
   if (focus && !dialogState) {
     const prompt = document.querySelector("#pn-prompt");
     prompt.focus({ preventScroll: true });

@@ -82,6 +82,38 @@ async function clipboard(page, fail = false) {
     });
   }, fail);
 }
+
+async function checkNoteLayout(page, text, screenshot) {
+  const note = page.locator("#pn-question-note"),
+    toggle = page.locator("#pn-note-toggle"),
+    answers = page.locator(".pn-answer-buttons");
+  await expect(note).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  const before = await answers.boundingBox();
+  await toggle.hover();
+  await expect(note).toBeVisible();
+  await expect(note).toHaveText(text);
+  await note.hover();
+  await expect(note).toBeVisible();
+  expect(await answers.boundingBox()).toEqual(before);
+  expect(
+    await note.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return (
+        r.left >= 0 &&
+        r.top >= 0 &&
+        r.right <= innerWidth &&
+        r.bottom <= innerHeight &&
+        el.scrollWidth <= el.clientWidth
+      );
+    }),
+  ).toBe(true);
+  await page.screenshot({ path: screenshot });
+  await expect(note).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(note).toBeHidden();
+  await page.mouse.move(0, 0);
+}
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
@@ -169,6 +201,57 @@ for (const key of ["mew", "charizard-mega-x", "growlithe-hisui"]) {
     ).toBe(false);
   });
 }
+
+test("a real round narrows to Steven before naming him, then survives language changes and undo", async ({
+  page,
+}) => {
+  const round = newRound(game, "stage-demo"),
+    target = candidate("metagross"),
+    index = game.pokemon.indexOf(target),
+    signature = "lore-steven-team";
+  await page.goto("./pokinator.html");
+  await seed(page, round);
+  let seen = false;
+  for (let step = 0; step < 25; step++) {
+    const view = viewRound(game, round);
+    expect(view.kind).toBe("question");
+    const q = view.question;
+    await expect(page.locator("#pn-prompt")).toHaveAttribute(
+      "data-question",
+      q.id,
+    );
+    if (q.id === signature) {
+      expect(view.known).toBeGreaterThanOrEqual(6);
+      expect(view.focus.topEight).toBeGreaterThanOrEqual(0.65);
+      await expect(page.locator("#pn-prompt")).toHaveText(
+        "성호가 사용하는 포켓몬인가요?",
+      );
+      await page.locator("[data-language-select]").selectOption("en");
+      await expect(page.locator("#pn-prompt")).toHaveText(q.en);
+      await page.reload();
+      await expect(page.locator("#pn-prompt")).toHaveAttribute(
+        "data-question",
+        signature,
+      );
+      await page.locator('[data-answer="yes"]').click();
+      await expect(page.locator(".pn-guess")).toBeVisible();
+      await page.locator('[data-action="undo"]').click();
+      await expect(page.locator("#pn-prompt")).toHaveText(q.en);
+      await page.locator("[data-language-select]").selectOption("ko");
+      await page.locator('[data-answer="yes"]').click();
+      await expect(page.locator(".pn-character")).toContainText(target.name);
+      await page.locator('[data-action="confirm"]').click();
+      await expect(page.locator(".pn-complete")).toBeVisible();
+      seen = true;
+      break;
+    }
+    const value = q.values[index],
+      answer = value === -1 ? "unknown" : value ? "yes" : "no";
+    await page.locator(`[data-answer="${answer}"]`).click();
+    answerQuestion(game, round, answer);
+  }
+  expect(seen).toBe(true);
+});
 
 test("unknown answers, keyboard input, history edits and navigation preserve the intended round", async ({
   page,
@@ -515,17 +598,13 @@ test("long game-title debut questions fit both languages and mobile sizes", asyn
       expect(
         await page.locator("#pn-prompt").evaluate((el) => {
           const rect = el.getBoundingClientRect(),
-            note = document
-              .querySelector("#pn-question-note")
-              .getBoundingClientRect(),
             buttons = document
               .querySelector(".pn-answer-buttons")
               .getBoundingClientRect();
           return (
             document.documentElement.scrollWidth <= innerWidth &&
             el.scrollWidth <= el.clientWidth &&
-            rect.bottom <= note.top &&
-            note.bottom <= buttons.top
+            rect.bottom <= buttons.top
           );
         }),
       ).toBe(true);
@@ -533,15 +612,35 @@ test("long game-title debut questions fit both languages and mobile sizes", asyn
         path: `.preview/pokinator-debut-${language}-${width}.png`,
         fullPage: true,
       });
+      await checkNoteLayout(
+        page,
+        q.note[language],
+        `.preview/pokinator-debut-note-${language}-${width}.png`,
+      );
     }
   }
 });
 
-for (const id of ["starter-family", "fossil-family", "standalone"]) {
+for (const id of [
+  "starter-family",
+  "fossil-family",
+  "standalone",
+  "lore-movie-lead",
+  "lore-trainer-ace-world",
+  "lore-ash-team",
+  "lore-smash-fighter",
+  "lore-steven-team",
+  "lore-alola-league-ace",
+]) {
   test(`${id} and its scope note fit both languages on mobile and desktop`, async ({
     page,
   }) => {
-    const q = data.questions.find((q) => q.id === id);
+    // Isolate the text layout; real adaptive gating is tested with full rounds.
+    const q = {
+      ...data.questions.find((q) => q.id === id),
+      specificity: "broad",
+      parents: [],
+    };
     await page.route("**/pokinator.json", (route) =>
       route.fulfill({ json: { ...data, questions: [q] } }),
     );
@@ -557,17 +656,17 @@ for (const id of ["starter-family", "fossil-family", "standalone"]) {
         expect(
           await page.locator("#pn-stage").evaluate((el) => {
             const prompt = el.querySelector("#pn-prompt"),
-              note = el.querySelector("#pn-question-note"),
+              toggle = el.querySelector("#pn-note-toggle"),
               buttons = el.querySelector(".pn-answer-buttons");
             return (
               document.documentElement.scrollWidth <= innerWidth &&
-              [prompt, note, buttons].every(
+              [prompt, toggle, buttons].every(
                 (node) => node.scrollWidth <= node.clientWidth,
               ) &&
               prompt.getBoundingClientRect().bottom <=
-                note.getBoundingClientRect().top &&
-              note.getBoundingClientRect().bottom <=
-                buttons.getBoundingClientRect().top
+                buttons.getBoundingClientRect().top &&
+              prompt.getBoundingClientRect().right <=
+                toggle.getBoundingClientRect().left
             );
           }),
         ).toBe(true);
@@ -575,10 +674,152 @@ for (const id of ["starter-family", "fossil-family", "standalone"]) {
           path: `.preview/pokinator-${id}-${language}-${width}.png`,
           fullPage: true,
         });
+        await checkNoteLayout(
+          page,
+          q.note[language],
+          `.preview/pokinator-${id}-note-${language}-${width}.png`,
+        );
       }
     }
   });
 }
+
+test("question notes are opt-in, keyboard accessible, dismissible and reset after answering or changing language", async ({
+  page,
+}) => {
+  const q = {
+    ...data.questions.find((q) => q.id === "lore-trainer-ace-world"),
+    specificity: "broad",
+    parents: [],
+  };
+  await page.route("**/pokinator.json", (route) =>
+    route.fulfill({ json: { ...data, questions: [q] } }),
+  );
+  await page.goto("./pokinator.html");
+  const note = page.getByRole("tooltip", { includeHidden: true }),
+    toggle = page.getByRole("button", { name: "질문 부가설명" });
+  await expect(note).toBeHidden();
+  await expect(page.locator("#pn-prompt")).not.toHaveAttribute(
+    "aria-describedby",
+  );
+  const saved = await page.evaluate(
+    (key) => localStorage.getItem(key),
+    STORAGE_KEY,
+  );
+  await page.locator("#pn-prompt").focus();
+  await page.keyboard.press("Tab");
+  await expect(toggle).toBeFocused();
+  await expect(note).toBeVisible();
+  await expect(toggle).toHaveAccessibleDescription(q.note.ko);
+  await page.keyboard.press("Escape");
+  await expect(note).toBeHidden();
+  await expect(toggle).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(note).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(note).toBeHidden();
+  await page.keyboard.press("Tab");
+  await expect(page.locator('[data-answer="yes"]')).toBeFocused();
+  await toggle.hover();
+  await expect(note).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(note).toBeHidden();
+  await toggle.click();
+  await expect(note).toBeVisible();
+  await page.locator(".pn-heading h1").click();
+  await expect(note).toBeHidden();
+  await toggle.click();
+  await page.locator("[data-language-select]").selectOption("en");
+  await expect(note).toBeHidden();
+  await page.getByRole("button", { name: "Question details" }).hover();
+  await expect(note).toHaveText(q.note.en);
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY),
+  ).toBe(saved);
+  await page.getByRole("button", { name: "Yes", exact: true }).click();
+  await expect(page.locator("#pn-note-toggle")).toHaveCount(0);
+  await expect(note).toHaveCount(0);
+  await page.locator('[data-action="undo"]').click();
+  await expect(note).toBeHidden();
+});
+
+test("question notes toggle by touch and remain on-screen on a small phone", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 320, height: 568 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage(),
+    q = {
+      ...data.questions.find((q) => q.id === "lore-trainer-ace-world"),
+      specificity: "broad",
+      parents: [],
+    };
+  await page.route("**/pokinator.json", (route) =>
+    route.fulfill({ json: { ...data, questions: [q] } }),
+  );
+  await page.goto("http://127.0.0.1:4173/pokemon/pokinator.html");
+  const note = page.locator("#pn-question-note"),
+    toggle = page.locator("#pn-note-toggle");
+  await expect(note).toBeHidden();
+  await toggle.tap();
+  await expect(note).toBeVisible();
+  expect(
+    await note.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return (
+        r.left >= 0 &&
+        r.right <= innerWidth &&
+        r.top >= 0 &&
+        r.bottom <= innerHeight
+      );
+    }),
+  ).toBe(true);
+  await page.screenshot({
+    path: ".preview/pokinator-note-touch.png",
+  });
+  await expect(note).toBeVisible();
+  await toggle.tap();
+  await expect(note).toBeHidden();
+  await toggle.tap();
+  await expect(note).toBeVisible();
+  await page.locator("#pn-prompt").tap();
+  await expect(note).toBeHidden();
+  await context.close();
+});
+
+test("the shorter third-stage question preserves existing progress and has no empty help icon", async ({
+  page,
+}) => {
+  const q = { ...data.questions.find((q) => q.id === "third-stage"), after: 0 };
+  await page.route("**/pokinator.json", (route) =>
+    route.fulfill({ json: { ...data, questions: [q] } }),
+  );
+  await page.goto("./pokinator.html");
+  const old = newRound(game, "before-note-update");
+  old.dataVersion = "89201605a43b72b1";
+  await seed(page, old);
+  await expect(page.locator("#pn-updated")).toHaveCount(0);
+  await expect(page.locator("#pn-prompt")).toHaveText(
+    "진화 계열의 세 번째 단계인가요?",
+  );
+  await expect(page.locator("#pn-note-toggle")).toHaveCount(0);
+  await page.locator("[data-language-select]").selectOption("en");
+  await expect(page.locator("#pn-prompt")).toHaveText(
+    "Is it the third stage of its evolution line?",
+  );
+  await page.getByRole("button", { name: "Yes", exact: true }).click();
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)),
+    STORAGE_KEY,
+  );
+  expect(saved.id).toBe(old.id);
+  expect(saved.events).toEqual([
+    { kind: "answer", question: "third-stage", value: "yes" },
+  ]);
+});
 
 test("question, guess, shortlist, result and help fit mobile and desktop in both languages with nonblank sprites", async ({
   page,

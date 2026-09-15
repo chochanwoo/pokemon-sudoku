@@ -7,6 +7,11 @@ import json
 from pathlib import Path
 import sqlite3
 
+if __package__:
+    from .pokinator_knowledge import compile_knowledge
+else:
+    from pokinator_knowledge import compile_knowledge
+
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "web" / "public"
 CACHE = ROOT / "data" / "cache" / "pokeapi" / "pokemon-form"
@@ -22,7 +27,7 @@ COLORS = {"black": "검정", "blue": "파랑", "brown": "갈색", "gray": "회�
 STARTERS = {1, 4, 7, 25, 133, 152, 155, 158, 252, 255, 258, 387, 390, 393,
             495, 498, 501, 650, 653, 656, 722, 725, 728, 810, 813, 816, 906, 909, 912}
 FOSSILS = {138, 140, 142, 345, 347, 408, 410, 564, 566, 696, 698, 880, 881, 882, 883}
-COMPATIBLE_DATA_VERSIONS = ["dd9a765f728dfe67"]
+COMPATIBLE_DATA_VERSIONS = ["dd9a765f728dfe67", "4934f47e1cf1f700", "3ab0d55d49a841dc", "89201605a43b72b1"]
 DEBUT_GAMES = {
     "red-green-japan": ("포켓몬스터 레드/그린", "Pokemon Red/Blue"),
     "gold-silver": ("포켓몬스터 금/은", "Pokemon Gold/Silver"),
@@ -156,7 +161,7 @@ def build():
     add("mythical", "환상의 포켓몬인가요?", "Is it a Mythical Pokemon?", "rarity", lambda p: p["mythical"])
     add("evolved", "진화체인가요?", "Is it an evolved Pokemon?", "evolution", lambda p: p["stage"] > 1, 1.05, .09,
         note={"ko": "메가진화는 진화 단계로 세지 않아요.", "en": "Mega Evolution does not count as an evolution stage."})
-    add("third-stage", "베이비 포켓몬을 포함해 진화 계열의 세 번째 단계인가요?", "Is it the third stage of its evolution line, counting baby Pokemon?", "evolution", lambda p: p["stage"] >= 3, .75, .1, 4)
+    add("third-stage", "진화 계열의 세 번째 단계인가요?", "Is it the third stage of its evolution line?", "evolution", lambda p: p["stage"] >= 3, .75, .1, 4)
     add("baby", "베이비 포켓몬인가요?", "Is it a baby Pokemon?", "evolution", lambda p: p["baby"], .9, .07)
     add("standalone", "진화 계열이 없는 단독 포켓몬인가요?", "Is it a standalone Pokemon with no evolution relatives?", "evolution", lambda p: p["standalone"], 1.05, .09,
         note={"ko": "메가진화와 폼체인지는 제외해요.", "en": "Do not count Mega Evolutions or form changes."})
@@ -198,6 +203,8 @@ def build():
         if count < 4:
             continue
         add(f"ability-{ability['id']}", f"숨겨진 특성을 포함해 '{ability['name']}' 특성을 가질 수 있나요?", f"Can it have {ability['english']}, including as a Hidden Ability?", "abilities", lambda p, n=ability["id"]: None if p["abilities"] is None else n in p["abilities"], .4, .07, 9)
+    knowledge = json.loads((ROOT / "data/pokinator-knowledge.json").read_text(encoding="utf-8"))
+    questions.extend(compile_knowledge(knowledge, rows, {key: s["key"] for key, s in species.items()}))
     data = {"version": "pokinator-v2", "policy": "base-regional-mega-v1", "catalogVersion": catalog["version"],
             "compatibleDataVersions": COMPATIBLE_DATA_VERSIONS,
             "pokemon": rows, "questions": questions, "counts": dict(Counter(p["kind"] for p in rows))}

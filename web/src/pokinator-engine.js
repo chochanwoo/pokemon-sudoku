@@ -27,6 +27,11 @@ const ANSWERABILITY = {
   generation: 0.7,
   appearance: 0.9,
   recognition: 0.9,
+  movies: 0.65,
+  anime: 0.8,
+  trainers: 0.7,
+  stories: 0.75,
+  "culture-games": 0.55,
   biology: 0.6,
   stats: 0.35,
   abilities: 0.4,
@@ -67,6 +72,22 @@ function logicalDomains(questions, count) {
 
 function impliedQuestions(game, answers) {
   const implied = new Set();
+  const contradicted = new Set();
+  for (const [id, ancestors] of game.ancestors) {
+    if (
+      answers.get(id) === 1 &&
+      [...ancestors].some((parent) => answers.get(parent) === 0)
+    )
+      contradicted.add(game.questionById.get(id).group);
+  }
+  // Only reviewed subset relations count; sharing a cast member is not logic.
+  for (const [id, ancestors] of game.ancestors) {
+    if (contradicted.has(game.questionById.get(id).group)) continue;
+    if (answers.get(id) === 1)
+      for (const parent of ancestors) implied.add(parent);
+    if ([...ancestors].some((parent) => answers.get(parent) === 0))
+      implied.add(id);
+  }
   for (const { members, patterns } of game.domains) {
     const constraints = members.flatMap((q, i) =>
       answers.has(q.id) ? [[i, answers.get(q.id)]] : [],
@@ -83,6 +104,38 @@ function impliedQuestions(game, answers) {
     });
   }
   return implied;
+}
+
+function questionAncestors(questionById) {
+  const ancestors = new Map(),
+    visiting = new Set();
+  function visit(id) {
+    if (!questionById.has(id) || visiting.has(id))
+      throw new Error("Invalid question parent");
+    if (ancestors.has(id)) return ancestors.get(id);
+    visiting.add(id);
+    const q = questionById.get(id),
+      result = new Set();
+    for (const parent of q.parents || []) {
+      const above = visit(parent),
+        p = questionById.get(parent);
+      if (
+        p.group !== q.group ||
+        q.values.some(
+          (v, i) =>
+            (v === 1 && p.values[i] !== 1) || (v === -1 && p.values[i] === 0),
+        )
+      )
+        throw new Error("Invalid question implication");
+      result.add(parent);
+      for (const ancestor of above) result.add(ancestor);
+    }
+    visiting.delete(id);
+    ancestors.set(id, result);
+    return result;
+  }
+  for (const id of questionById.keys()) visit(id);
+  return ancestors;
 }
 
 function predictAnswer(state, q) {
@@ -232,6 +285,14 @@ export function createPokinator(catalog, data) {
       q.after < 0 ||
       q.after >= MAX_QUESTIONS ||
       typeof q.expert !== "boolean" ||
+      (q.contextual !== undefined && typeof q.contextual !== "boolean") ||
+      (q.retired !== undefined && typeof q.retired !== "boolean") ||
+      (q.specificity !== undefined &&
+        !["broad", "focused", "signature"].includes(q.specificity)) ||
+      (q.parents !== undefined &&
+        (!Array.isArray(q.parents) ||
+          q.parents.some((id) => typeof id !== "string") ||
+          new Set(q.parents).size !== q.parents.length)) ||
       (q.note !== undefined &&
         (!q.note ||
           typeof q.note.ko !== "string" ||
@@ -257,6 +318,7 @@ export function createPokinator(catalog, data) {
     byId,
     questions,
     questionById,
+    ancestors: questionAncestors(questionById),
     domains: logicalDomains(questions, pokemon.length),
     priors: normalize(
       Float64Array.from(pokemon, (p) => 1 / speciesCounts.get(p.speciesId)),
@@ -388,6 +450,7 @@ export function inference(game, events) {
   let answered = 0,
     known = 0,
     lastPause = -10,
+    lastContext = 0,
     continued = false,
     expertAnswers = 0,
     expertUnknown = false;
@@ -396,6 +459,7 @@ export function inference(game, events) {
       const q = game.questionById.get(e.question);
       asked.add(q.id);
       answered++;
+      if (q.contextual) lastContext = answered;
       if (q.expert) {
         expertAnswers++;
         if (e.value === "unknown") expertUnknown = true;
@@ -423,6 +487,7 @@ export function inference(game, events) {
   }
   return {
     ...beliefs,
+    focus: candidateFocus(game, beliefs.weights),
     groups,
     unknownGroups,
     resolvedFamilies,
@@ -432,19 +497,66 @@ export function inference(game, events) {
     answered,
     known,
     lastPause,
+    lastContext,
     continued,
     expertAnswers,
     expertUnknown,
   };
 }
 
+function candidateFocus(game, weights) {
+  // Lore is species-based, so multiple forms must not inflate the shortlist.
+  const species = new Map();
+  game.pokemon.forEach((p, i) =>
+    species.set(p.speciesId, (species.get(p.speciesId) || 0) + weights[i]),
+  );
+  const ranked = [...species].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  const mass = (count) =>
+    ranked.slice(0, count).reduce((sum, [, weight]) => sum + weight, 0);
+  return {
+    topEight: mass(8),
+    topTwenty: mass(20),
+    leading: new Set(ranked.slice(0, 3).map(([id]) => id)),
+  };
+}
+
+export function isQuestionReady(game, state, q) {
+  if (q.retired) return false;
+  if (!q.specificity || q.specificity === "broad") return true;
+  const signature = q.specificity === "signature";
+  if (state.known < (signature ? 6 : 4)) return false;
+  const focus = state.focus || candidateFocus(game, state.weights);
+  if ((signature ? focus.topEight : focus.topTwenty) < (signature ? 0.65 : 0.5))
+    return false;
+  let yesMass = 0,
+    knownMass = 0,
+    matchesLeader = false;
+  q.values.forEach((value, i) => {
+    if (value !== -1) knownMass += state.weights[i];
+    if (value === 1) {
+      yesMass += state.weights[i];
+      if (focus.leading.has(game.pokemon[i].speciesId)) matchesLeader = true;
+    }
+  });
+  // Use raw positive evidence, not P(yes), whose error floor can look plausible.
+  return (
+    knownMass >= 0.75 &&
+    yesMass >= (signature ? 0.25 : 0.12) &&
+    (!signature || matchesLeader)
+  );
+}
+
 export function nextQuestion(game, state, seed) {
   let best = null,
     bestScore = 0,
+    contextual = null,
+    contextScore = 0,
     expert = null,
     expertScore = 0;
   for (const q of game.questions) {
-    if (state.asked.has(q.id) || q.after > state.answered) continue;
+    if (q.retired || state.asked.has(q.id) || q.after > state.answered)
+      continue;
+    if (!isQuestionReady(game, state, q)) continue;
     // A confirmed single-valued fact needs no more alternatives. This only
     // suppresses redundant questions; soft candidate weights remain intact.
     if (
@@ -463,6 +575,7 @@ export function nextQuestion(game, state, seed) {
     const unknown = state.unknownGroups.get(q.group) || 0;
     if (["abilities", "stats"].includes(q.group) && unknown > 0 && known === 0)
       continue;
+    if (q.contextual && unknown >= 2 && known === 0) continue;
     const { knownMass, gain } = evaluateQuestion(state, q);
     if (knownMass < 0.05) continue;
     const answerability =
@@ -472,6 +585,10 @@ export function nextQuestion(game, state, seed) {
       q.ease *
       answerability *
       (1 + (hash(`${seed}:${q.id}`) % 100) / 2000);
+    if (q.contextual && gain >= 0.08 && score > contextScore + 1e-12) {
+      contextual = q;
+      contextScore = score;
+    }
     if (q.expert) {
       // Reserve unfamiliar trivia for a substantially better late tiebreaker.
       if (gain >= 0.25 && score > expertScore + 1e-12) {
@@ -484,6 +601,13 @@ export function nextQuestion(game, state, seed) {
     }
   }
   if (expert && expertScore > bestScore * 2) return expert;
+  // Give useful franchise memories a turn, without forcing irrelevant trivia.
+  if (
+    contextual &&
+    state.answered - state.lastContext >= 3 &&
+    contextScore >= bestScore * 0.6
+  )
+    return contextual;
   return bestScore > 1e-8 ? best : null;
 }
 

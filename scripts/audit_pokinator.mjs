@@ -16,8 +16,8 @@ const trivia = new Set(["abilities", "stats", "biology", "size", "eggs"]);
 const profiles = process.argv.slice(2);
 for (const profile of profiles.length
   ? profiles
-  : ["database", "casual", "historical"]) {
-  if (!["database", "casual", "historical"].includes(profile))
+  : ["database", "casual", "historical", "no-lore"]) {
+  if (!["database", "casual", "historical", "no-lore"].includes(profile))
     throw new Error(`Unknown profile: ${profile}`);
   const started = performance.now(),
     counts = {},
@@ -50,7 +50,9 @@ for (const profile of profiles.length
             ? q.pastValues[index]
             : q.values[index];
         const value =
-          fact === -1 || (profile !== "database" && trivia.has(q.group))
+          fact === -1 ||
+          (profile !== "database" && trivia.has(q.group)) ||
+          (profile === "no-lore" && q.contextual)
             ? "unknown"
             : fact
               ? "yes"

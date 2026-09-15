@@ -8,6 +8,7 @@ export default {
   "포키네이터의 질문에 예, 아니오, 모르겠습니다로 답하는 화면":
     "Answering Pokinator with Yes, No or I don't know",
   "마음속의 포켓몬은…": "The Pokemon on your mind...",
+  "질문 부가설명": "Question details",
   예: "Yes",
   아니오: "No",
   모르겠습니다: "I don't know",

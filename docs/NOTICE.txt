@@ -24,6 +24,14 @@ Its homepage previews are screenshots of the actual game, in Korean and English.
 Pokinator's separate base/regional/Mega answer pool and question matrix are built
 from the read-only PokeAPI-derived database by scripts/build_pokinator.py.
 Species-level appearance is intentionally unknown for regional and Mega forms.
+Pokinator's manually curated franchise questions use original Korean/English
+wording. Reviewed facts, bounded scopes and per-question source references are
+in data/pokinator-knowledge.json; compiled references are in pokinator.json.
+References: PokeAPI Pokedex entries, Pokemon.com movie summaries, Serebii.net
+trainer teams, episode guides and game rosters, Bulbapedia movie/cast/box-mascot
+references, and the official Smash Bros. Ultimate fighter roster.
+These are scoped facts, not a complete history
+of every Pokemon appearance. Lore applies to species, not evolution families.
 Original character and sprite rights remain with Nintendo, Creatures and
 GAME FREAK; the hosting project does not grant rights to Pokemon artwork.
 

@@ -7,6 +7,7 @@ import {
   restoreRound,
   inference,
   evaluateQuestion,
+  isQuestionReady,
   nextQuestion,
   viewRound,
   answerQuestion,
@@ -228,6 +229,8 @@ test("question gains and predicted posteriors exactly match real answer updates"
       "color-blue",
       "regional",
       "starter-family",
+      "lore-ash-team",
+      "lore-movie-lead",
     ]) {
       const q = game.questionById.get(id),
         predicted = evaluateQuestion(state, q);
@@ -707,7 +710,7 @@ test("saves round-trip questions, rejections, paused guesses and completed resul
 
 test("compatible question additions preserve old progress and human-confirmed results across repeated reloads", () => {
   const old = newRound(game, "before-update");
-  old.dataVersion = "dd9a765f728dfe67";
+  old.dataVersion = "4934f47e1cf1f700";
   old.events = [
     { kind: "answer", question: "dual-type", value: "no" },
     { kind: "answer", question: "type-14", value: "yes" },
@@ -796,4 +799,363 @@ test("bilingual search only returns the dedicated candidate pool", () => {
     );
   assert.equal(searchCandidates(game, "pichu-spiky-eared").length, 0);
   assert.equal(searchCandidates(game, "arceus-unknown").length, 0);
+});
+
+test("reviewed lore implications avoid repeated premises, preserve uncertainty and rewind cleanly", () => {
+  const answer = (question, value = "yes") => ({
+    kind: "answer",
+    question,
+    value,
+  });
+  const noGym = inference(game, [answer("lore-gym-ace", "no")]);
+  for (const id of [
+    "lore-kanto-ace",
+    "lore-johto-ace",
+    "lore-sinnoh-ace",
+    "lore-first-gym",
+  ])
+    assert.ok(noGym.implied.has(id), id);
+  assert.ok(!noGym.implied.has("lore-cynthia-team"));
+  assert.ok(!noGym.implied.has("lore-league-ace"));
+  assert.ok(noGym.weights.every((w) => w > 0));
+  const yesJohto = inference(game, [answer("lore-johto-ace")]);
+  assert.ok(yesJohto.implied.has("lore-gym-ace"));
+  assert.ok(yesJohto.implied.has("lore-trainer-ace"));
+  assert.ok(
+    !inference(game, [answer("lore-gym-ace", "unknown")]).implied.has(
+      "lore-johto-ace",
+    ),
+  );
+  const conflicting = inference(game, [
+    answer("lore-gym-ace", "no"),
+    answer("lore-johto-ace"),
+  ]);
+  assert.ok(!conflicting.implied.has("lore-sinnoh-ace"));
+  assert.ok(conflicting.weights.every((w) => w > 0));
+  const round = newRound(game, "lore-undo");
+  round.events.push(answer("lore-companion-team", "no"));
+  assert.ok(viewRound(game, round).implied.has("lore-misty-team"));
+  assert.ok(undo(round));
+  assert.ok(!viewRound(game, round).implied.has("lore-misty-team"));
+});
+
+test("useful contextual questions get a turn but weak trivia is never forced", () => {
+  const regular = {
+    id: "regular",
+    group: "type",
+    values: Int8Array.of(0, 1),
+    error: 0.12,
+    ease: 1,
+    after: 0,
+    expert: false,
+  };
+  const lore = {
+    ...regular,
+    id: "lore",
+    group: "anime",
+    contextual: true,
+    error: 0.14,
+    ease: 0.9,
+  };
+  const tiny = { questions: [regular, lore] },
+    state = {
+      ...inference(game, []),
+      weights: Float64Array.of(0.5, 0.5),
+      answered: 3,
+    };
+  assert.equal(nextQuestion(tiny, state, "test").id, "lore");
+  assert.equal(
+    nextQuestion(tiny, { ...state, lastContext: 2 }, "test").id,
+    "regular",
+  );
+  lore.values = Int8Array.of(1, 1);
+  assert.equal(nextQuestion(tiny, state, "test").id, "regular");
+});
+
+test("unfamiliar lore topics back off independently and missing cast facts are neutral", () => {
+  const events = ["lore-ash-team", "lore-rocket-team"].map((question) => ({
+    kind: "answer",
+    question,
+    value: "unknown",
+  }));
+  const state = inference(game, events);
+  assert.deepEqual(state.weights, game.priors);
+  assert.equal(state.lastContext, 2);
+  const only = (group) => ({
+    ...game,
+    questions: game.questions.filter((q) => q.group === group),
+  });
+  assert.equal(nextQuestion(only("anime"), state, "test"), null);
+  assert.ok(nextQuestion(only("movies"), state, "test"));
+  const haunter = game.pokemon.indexOf(byKey("haunter"));
+  for (const value of ["yes", "no"]) {
+    const cast = inference(game, [
+      { kind: "answer", question: "lore-ash-team", value },
+    ]);
+    assert.ok(Math.abs(cast.weights[haunter] - game.priors[haunter]) < 1e-12);
+    assert.ok(cast.weights.every((w) => w > 0));
+  }
+});
+
+test("lore is used in actual adaptive rounds, but knowing it is not required", () => {
+  for (const profile of ["known", "unknown", "one-wrong"]) {
+    for (const key of [
+      "mewtwo",
+      "pikachu",
+      "garchomp",
+      "miltank",
+      "psyduck",
+      "mr-mime",
+      "lucario-mega",
+      "zoroark-hisui",
+    ]) {
+      const target = byKey(key),
+        index = game.pokemon.indexOf(target),
+        round = newRound(game, "lore-play");
+      let contexts = 0,
+        found = false;
+      for (let step = 0; step < 30; step++) {
+        const view = viewRound(game, round);
+        if (view.kind === "question") {
+          const q = view.question;
+          let value = q.values[index];
+          if (q.contextual) {
+            contexts++;
+            if (profile === "unknown") value = -1;
+            if (profile === "one-wrong" && contexts === 1 && value !== -1)
+              value = 1 - value;
+          }
+          if (
+            ["stats", "abilities", "size", "eggs", "biology"].includes(q.group)
+          )
+            value = -1;
+          answerQuestion(
+            game,
+            round,
+            value === -1 ? "unknown" : value ? "yes" : "no",
+          );
+        } else if (view.kind === "guess" && view.guess.id !== target.id)
+          rejectGuess(game, round);
+        else {
+          found = view.kind === "guess";
+          break;
+        }
+      }
+      assert.ok(contexts > 0, `${profile}: ${key} had no contextual questions`);
+      assert.ok(found, `${profile}: ${key}`);
+    }
+  }
+});
+
+test("invalid contextual metadata, cycles and fabricated subset relations reject the bundle", () => {
+  for (const changes of [
+    { contextual: "yes" },
+    { specificity: "always" },
+    { retired: "yes" },
+    { parents: ["missing"] },
+    { parents: ["lore-ash-team"] },
+    { parents: ["lore-movie-lead"] },
+    { parents: ["lore-movie-artificial"] },
+  ]) {
+    assert.throws(() =>
+      createPokinator(catalog, {
+        ...data,
+        questions: data.questions.map((q) =>
+          q.id === "lore-movie-lead" ? { ...q, ...changes } : q,
+        ),
+      }),
+    );
+  }
+});
+
+test("specific trivia needs concentrated beliefs and relevant known facts, not just elapsed turns", () => {
+  const broad = game.questionById.get("lore-movie-lead"),
+    focused = game.questionById.get("lore-artificial"),
+    signature = game.questionById.get("lore-steven-team"),
+    start = inference(game, []);
+  assert.ok(isQuestionReady(game, start, broad));
+  for (const q of [focused, signature]) {
+    assert.equal(isQuestionReady(game, start, q), false);
+    assert.equal(
+      isQuestionReady(game, { ...start, answered: 25, known: 25 }, q),
+      false,
+    );
+  }
+  const tiny = {
+    pokemon: Array.from({ length: 30 }, (_, i) => ({ speciesId: i })),
+  };
+  const q = {
+    specificity: "signature",
+    values: Int8Array.from({ length: 30 }, (_, i) => (i === 0 ? 1 : 0)),
+  };
+  const state = {
+    known: 6,
+    weights: Float64Array.from({ length: 30 }, (_, i) =>
+      i === 0 ? 0.7 : 0.3 / 29,
+    ),
+  };
+  assert.ok(isQuestionReady(tiny, state, q));
+  assert.equal(
+    isQuestionReady(tiny, { ...state, known: 5, answered: 25 }, q),
+    false,
+  );
+  assert.equal(
+    isQuestionReady(tiny, { ...state, known: 0, answered: 25 }, q),
+    false,
+  );
+  assert.equal(isQuestionReady(tiny, state, { ...q, retired: true }), false);
+  assert.equal(
+    isQuestionReady(tiny, state, { ...q, values: new Int8Array(30) }),
+    false,
+  );
+  assert.equal(
+    isQuestionReady(tiny, state, {
+      ...q,
+      values: Int8Array.from({ length: 30 }, (_, i) => (i === 0 ? 1 : -1)),
+    }),
+    false,
+  );
+  assert.equal(
+    isQuestionReady(
+      tiny,
+      { ...state, focus: { topEight: 0.64, leading: new Set([0]) } },
+      q,
+    ),
+    false,
+  );
+  assert.equal(
+    isQuestionReady(
+      tiny,
+      { ...state, focus: { topEight: 0.9, leading: new Set([1, 2, 3]) } },
+      q,
+    ),
+    false,
+  );
+  const mid = { ...q, specificity: "focused" },
+    midState = {
+      ...state,
+      known: 4,
+      focus: { topTwenty: 0.5, leading: new Set([0]) },
+    };
+  assert.ok(isQuestionReady(tiny, midState, mid));
+  assert.equal(isQuestionReady(tiny, { ...midState, known: 3 }, mid), false);
+  assert.equal(
+    isQuestionReady(tiny, { ...midState, focus: { topTwenty: 0.49 } }, mid),
+    false,
+  );
+});
+
+test("candidate focus combines forms without counting a species repeatedly", () => {
+  const target = byKey("charizard"),
+    weights = Float64Array.from(game.pokemon, (p) =>
+      p.speciesId === target.speciesId
+        ? 0.7 / 3
+        : 0.3 / (game.pokemon.length - 3),
+    ),
+    q = {
+      specificity: "signature",
+      values: Int8Array.from(game.pokemon, (p) =>
+        p.speciesId === target.speciesId ? 1 : 0,
+      ),
+    };
+  assert.equal(
+    game.pokemon.filter((p) => p.speciesId === target.speciesId).length,
+    3,
+  );
+  assert.ok(isQuestionReady(game, { weights, known: 6 }, q));
+  const initial = inference(game, []);
+  assert.ok(Math.abs(initial.focus.topEight - 8 / 1025) < 1e-12);
+  assert.ok(Math.abs(initial.focus.topTwenty - 20 / 1025) < 1e-12);
+});
+
+test("named trainer questions arrive late in real adaptive rounds and readiness rewinds", () => {
+  for (const [key, expected] of [
+    ["garchomp", "lore-cynthia-team"],
+    ["metagross", "lore-steven-team"],
+    ["gardevoir", "lore-diantha-team"],
+    ["glimmora", "lore-geeta-team"],
+  ]) {
+    const target = byKey(key),
+      index = game.pokemon.indexOf(target),
+      round = newRound(game, "stage-demo");
+    let seen = false,
+      found = false;
+    for (let i = 0; i < 30; i++) {
+      const v = viewRound(game, round);
+      if (v.kind === "question") {
+        const q = v.question;
+        assert.ok(!q.retired);
+        assert.ok(isQuestionReady(game, v, q), q.id);
+        if (q.id === expected) {
+          seen = true;
+          assert.ok(v.known >= 6 && v.focus.topEight >= 0.65);
+          assert.equal(q.values[index], 1);
+          const rewind = restoreRound(JSON.stringify(round), game, "fallback");
+          assert.ok(undo(rewind, 0));
+          assert.equal(
+            isQuestionReady(game, viewRound(game, rewind), q),
+            false,
+          );
+        }
+        const value = q.values[index];
+        answerQuestion(
+          game,
+          round,
+          value === -1 ? "unknown" : value ? "yes" : "no",
+        );
+      } else if (v.kind === "guess" && v.guess.id !== target.id)
+        rejectGuess(game, round);
+      else {
+        found = v.kind === "guess";
+        break;
+      }
+    }
+    assert.ok(seen, key);
+    assert.ok(found, key);
+  }
+});
+
+test("retired scoped answers survive old saves without acquiring worldwide meanings", () => {
+  const old = newRound(game, "scoped-legacy");
+  old.dataVersion = "3ab0d55d49a841dc";
+  old.events = [
+    { kind: "answer", question: "lore-gym-ace", value: "no" },
+    { kind: "answer", question: "lore-movie-artificial", value: "no" },
+    { kind: "answer", question: "dual-type", value: "yes" },
+    { kind: "answer", question: "regional", value: "no" },
+  ];
+  const restored = restoreRound(JSON.stringify(old), game, "fallback"),
+    state = inference(game, restored.events);
+  assert.deepEqual(restored.events, old.events);
+  assert.ok(!state.implied.has("lore-gym-ace-world"));
+  assert.ok(!state.implied.has("lore-hoenn-ace"));
+  assert.ok(!state.implied.has("lore-artificial"));
+  assert.equal(
+    nextQuestion(
+      { ...game, questions: game.questions.filter((q) => q.retired) },
+      inference(game, []),
+      "legacy",
+    ),
+    null,
+  );
+  const globalNo = inference(game, [
+    { kind: "answer", question: "lore-gym-ace-world", value: "no" },
+  ]);
+  for (const id of [
+    "lore-first-gym",
+    "lore-kanto-ace",
+    "lore-hoenn-ace",
+    "lore-paldea-ace",
+  ])
+    assert.ok(globalNo.implied.has(id), id);
+  old.result = { id: byKey("metagross").id, outcome: "guessed" };
+  const completed = restoreRound(JSON.stringify(old), game, "fallback");
+  assert.deepEqual(completed.result, {
+    ...old.result,
+    legacyDataVersion: old.dataVersion,
+  });
+  assert.deepEqual(
+    restoreRound(JSON.stringify(completed), game, "fallback"),
+    completed,
+  );
 });
