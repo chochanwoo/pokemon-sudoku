@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   createScratch,
   area,
+  potentialScore,
   newRound,
   erase,
   guess,
@@ -93,6 +94,13 @@ test("scratch is the sixth bilingual hub game, with real previews and only local
   await en.click();
   await ready(page);
   await expect(page).toHaveTitle("Poke Scratch | Pokemon Quiz");
+  await expect(page.locator("#sc-input")).not.toHaveAttribute("placeholder");
+  await expect(
+    page.getByRole("combobox", {
+      name: "Pokemon name or Pokedex number",
+      exact: true,
+    }),
+  ).toBeVisible();
   expect(await page.locator(".sc-main").innerText()).not.toMatch(/[가-힣]/);
   expect(requests.every((url) => new URL(url).hostname === "127.0.0.1")).toBe(
     true,
@@ -126,6 +134,13 @@ test("the cover is opaque, real pixels render, and unique erased area survives r
   const first = await saved(page),
     mask = await pixels(page),
     points = await page.locator("#sc-points").innerText();
+  expect(Number(points)).toBe(
+    potentialScore(first.items[0].erased, area(target), 0),
+  );
+  expect(Number(points)).toBeLessThan(
+    Math.round(100 - (100 * first.items[0].erased) / area(target)),
+  );
+  await expect(page.locator("#sc-input")).not.toHaveAttribute("placeholder");
   expect(first.items[0].erased).toBeGreaterThan(1000);
   expect(mask.opaque).toBe(area(target) - first.items[0].erased);
   await stroke(page);
@@ -488,3 +503,72 @@ test("partially completed rounds restore the current picture and full saved scor
   await inputGuess(page, current(round).id);
   await expect(page.locator("#sc-next")).toBeVisible();
 });
+
+for (const completed of [2, 5]) {
+  test(`legacy scoring migration preserves ${completed} earned scores and resumes without resetting`, async ({
+    page,
+  }) => {
+    const round = newRound(game, practice);
+    for (let i = 0; i < completed; i++) {
+      erase(round, game, [100, 100], [160, 140], 12);
+      guess(round, game, current(round).id);
+      if (i < 4) advance(round);
+    }
+    if (completed < 5) erase(round, game, [100, 100], [160, 140], 12);
+    const legacy = JSON.parse(serializeRound(round));
+    for (const item of legacy.items) {
+      delete item.scoreVersion;
+      if (item.outcome === "solved")
+        item.points = Math.max(
+          10,
+          Math.round(
+            100 -
+              (100 * item.erased) / area(game.byId.get(item.id)) -
+              5 * (item.guesses.length - 1),
+          ),
+        );
+    }
+    const total = legacy.items.reduce((sum, item) => sum + item.points, 0);
+    await page.addInitScript(
+      ({ key, value }) => {
+        if (!localStorage.getItem(key)) localStorage.setItem(key, value);
+      },
+      { key: storageKey(game, practice), value: JSON.stringify(legacy) },
+    );
+    await page.goto(path);
+    await expect(page.locator("#sc-total")).toHaveText(String(total));
+    const migrated = await saved(page);
+    expect(migrated.index).toBe(legacy.index);
+    for (let i = 0; i < completed; i++) {
+      expect(migrated.items[i].points).toBe(legacy.items[i].points);
+      expect(migrated.items[i].scoreVersion).toBe(1);
+    }
+    if (completed < 5) {
+      await ready(page);
+      const item = migrated.items[migrated.index];
+      expect(item.mask).toBe(legacy.items[legacy.index].mask);
+      expect(item.scoreVersion).toBe(2);
+      const points = potentialScore(
+        item.erased,
+        area(game.byId.get(item.id)),
+        0,
+      );
+      await expect(page.locator("#sc-points")).toHaveText(String(points));
+      await inputGuess(page, item.id);
+      await expect(page.locator("#sc-total")).toHaveText(
+        String(total + points),
+      );
+    } else {
+      await expect(page.locator(".sc-results li")).toHaveCount(5);
+      await expect(page.locator("#sc-dialog")).not.toBeVisible();
+      await act(page, "stats").click();
+      await expect(page.locator(".sc-records > div > strong")).toHaveText(
+        String(total),
+      );
+    }
+    const finished = await saved(page);
+    await page.reload();
+    await expect(page.locator("#sc-next")).toBeVisible();
+    expect(await saved(page)).toEqual(finished);
+  });
+}

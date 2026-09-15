@@ -34,8 +34,8 @@ export default {
     "This picture earns 0 points. You can then move on to the next picture.",
   "가림막을 직접 지우며 포켓몬을 맞혀 보세요. 마우스나 손가락으로 문지르거나, 보드에 초점을 둔 뒤 방향키로 이동하고 Space 또는 Enter로 지울 수 있어요.":
     "Erase the cover and identify the Pokemon. Drag with a mouse or finger, or focus the board, move with arrow keys and erase with Space or Enter.",
-  "점수는 100점에서 지운 면적 비율과 오답당 5점을 뺍니다. 맞히면 최소 10점, 정답을 공개하면 0점이에요. 시간 감점은 없어요.":
-    "Start at 100 points, subtract the percentage erased and 5 per wrong guess. Correct answers earn at least 10 points; revealing the answer earns 0. There is no time penalty.",
+  "100점에서 시작하며, 초반에는 크게, 이후에는 완만하게 감점돼요. 오답당 5점을 추가로 뺍니다. 맞히면 최소 10점, 정답 공개는 0점이며 시간 감점은 없어요.":
+    "Start at 100 points. The score falls exponentially with the area erased: faster at first, then more slowly. Each wrong guess costs another 5 points. Correct answers earn at least 10; revealing the answer earns 0. There is no time penalty.",
   "빈 여백을 잘라낸 그림 영역만 계산하며, 같은 곳을 다시 지워도 추가 감점은 없어요. 지운 부분은 새로고침해도 유지돼요.":
     "Only the tightly cropped picture area counts. Erasing the same spot costs nothing extra, and erased areas survive a reload.",
   "한 세트는 5문제, 총 500점입니다. 기본 모습·리전폼·메가진화가 등장하며, 같은 그림을 쓰는 모습은 같은 정답으로 인정해요.":

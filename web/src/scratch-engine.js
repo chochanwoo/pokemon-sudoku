@@ -5,6 +5,8 @@ import { englishName } from "./pokemon-names.js";
 export { dayKey };
 export const SIZE = 256;
 export const COUNT = 5;
+export const SCORE_DECAY = 3;
+const SCORE_VERSION = 2;
 export const RANKS = [
   { rank: "S", min: 450 },
   { rank: "A", min: 375 },
@@ -103,7 +105,10 @@ export const searchCandidates = (game, query) =>
   searchForms(game.pokemon, query);
 export const area = (p) => p.frame[2] * p.frame[3];
 export const potentialScore = (erased, total, mistakes) =>
-  Math.max(10, Math.round(100 - (100 * erased) / total - 5 * mistakes));
+  Math.max(
+    10,
+    Math.round(100 * Math.exp((-SCORE_DECAY * erased) / total) - 5 * mistakes),
+  );
 export const current = (round) => round.items[round.index];
 export const isEnded = (round) =>
   round.index === COUNT - 1 && !!current(round).outcome;
@@ -120,6 +125,7 @@ export function newRound(game, settings) {
       guesses: [],
       outcome: null,
       points: 0,
+      scoreVersion: SCORE_VERSION,
       mask: new Uint8Array(SIZE * SIZE),
     })),
   };
@@ -191,6 +197,7 @@ export function guess(round, game, id) {
   item.guesses.push(id);
   if (candidate.art !== target.art) return "incorrect";
   item.outcome = "solved";
+  item.scoreVersion = SCORE_VERSION;
   item.points = potentialScore(
     item.erased,
     area(target),
@@ -265,6 +272,8 @@ export function restoreRound(raw, game, settings) {
         !Number.isInteger(item.erased) ||
         item.erased < 0 ||
         item.erased > n ||
+        (Object.hasOwn(item, "scoreVersion") &&
+          ![1, SCORE_VERSION].includes(item.scoreVersion)) ||
         !Array.isArray(item.guesses) ||
         item.guesses.length > game.pokemon.length ||
         item.guesses.some((id) => !game.byId.has(id))
@@ -281,9 +290,19 @@ export function restoreRound(raw, game, settings) {
           : correct !== -1)
       )
         throw new Error("Invalid guesses");
+      // Preserve earned legacy points without changing the daily seed or active mask.
+      const scoreVersion =
+        item.outcome === "solved" ? (item.scoreVersion ?? 1) : SCORE_VERSION;
       const points =
         item.outcome === "solved"
-          ? potentialScore(item.erased, n, arts.length - 1)
+          ? scoreVersion === 1
+            ? Math.max(
+                10,
+                Math.round(
+                  100 - (100 * item.erased) / n - 5 * (arts.length - 1),
+                ),
+              )
+            : potentialScore(item.erased, n, arts.length - 1)
           : 0;
       if (item.points !== points) throw new Error("Invalid score");
       let mask = new Uint8Array(SIZE * SIZE);
@@ -310,6 +329,7 @@ export function restoreRound(raw, game, settings) {
         guesses: [...item.guesses],
         outcome: item.outcome,
         points,
+        scoreVersion,
         mask,
       };
     });

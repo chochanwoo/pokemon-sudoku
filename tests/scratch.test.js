@@ -126,8 +126,8 @@ test("fixed-resolution erasing charges only new pixels within the tightly croppe
     assert.equal(eraseMask(mask, frame, [80, 80], [80, 80], radius).length, 0);
 });
 test("point examples, rounding, correct-answer minimum and all trainer cutoffs", () => {
-  assert.equal(potentialScore(12, 100, 0), 88);
-  assert.equal(potentialScore(30, 100, 1), 65);
+  assert.equal(potentialScore(12, 100, 0), 70);
+  assert.equal(potentialScore(30, 100, 1), 36);
   assert.equal(potentialScore(100, 100, 0), 10);
   assert.equal(potentialScore(100, 100, 30), 10);
   for (let i = 0; i < RANKS.length; i++) {
@@ -137,6 +137,103 @@ test("point examples, rounding, correct-answer minimum and all trainer cutoffs",
   }
   for (const invalid of [-1, 501, 2.5, NaN])
     assert.equal(rankFor(invalid), null);
+});
+
+test("exponential scoring falls fastest early and depends only on the total revealed fraction", () => {
+  const percentages = [0, 5, 10, 20, 30, 50, 100];
+  assert.deepEqual(
+    percentages.map((p) => potentialScore(p, 100, 0)),
+    [100, 86, 74, 55, 41, 22, 10],
+  );
+  let previous = 100;
+  for (let p = 0; p <= 100; p += 0.1) {
+    const score = potentialScore(p, 100, 0);
+    assert.ok(score <= previous && score >= 10);
+    assert.ok(score <= Math.max(10, Math.round(100 - p)));
+    previous = score;
+  }
+  const earlyDrop = potentialScore(0, 100, 0) - potentialScore(10, 100, 0);
+  const laterDrop = potentialScore(40, 100, 0) - potentialScore(50, 100, 0);
+  assert.ok(earlyDrop > laterDrop);
+  assert.equal(potentialScore(1200, 10000, 1), potentialScore(12, 100, 1));
+});
+
+const legacySave = (round) => {
+  const saved = snapshot(round);
+  for (const item of saved.items) {
+    delete item.scoreVersion;
+    if (item.outcome === "solved")
+      item.points = Math.max(
+        10,
+        Math.round(
+          100 -
+            (100 * item.erased) / area(game.byId.get(item.id)) -
+            5 * (item.guesses.length - 1),
+        ),
+      );
+  }
+  return saved;
+};
+
+test("legacy progress keeps earned points, guesses and masks while unfinished pictures adopt the new curve", () => {
+  const old = newRound(game, settings);
+  erase(old, game, [100, 100], [160, 160], 16);
+  guess(old, game, current(old).id);
+  advance(old);
+  erase(old, game, [100, 100], [160, 160], 16);
+  const wrong = game.pokemon.find(
+    (p) => p.art !== game.byId.get(current(old).id).art,
+  );
+  guess(old, game, wrong.id);
+  const saved = legacySave(old);
+  const restored = restoreRound(JSON.stringify(saved), game, settings);
+  assert.equal(restored.index, 1);
+  assert.equal(restored.items[0].points, saved.items[0].points);
+  assert.equal(restored.items[0].scoreVersion, 1);
+  assert.deepEqual(current(restored).mask, current(old).mask);
+  assert.deepEqual(current(restored).guesses, [wrong.id]);
+  assert.equal(current(restored).scoreVersion, 2);
+  const expected = potentialScore(
+    current(restored).erased,
+    area(game.byId.get(current(restored).id)),
+    1,
+  );
+  guess(restored, game, current(restored).id);
+  assert.equal(current(restored).points, expected);
+  const serialized = serializeRound(restored);
+  assert.equal(
+    serializeRound(restoreRound(serialized, game, settings)),
+    serialized,
+  );
+  assert.deepEqual(
+    restored.items.map((p) => p.id),
+    game.targets(settings),
+  );
+});
+
+test("completed legacy rounds retain their total and rank instead of being reset or rescored", () => {
+  const old = newRound(game, settings);
+  for (let i = 0; i < COUNT; i++) {
+    erase(old, game, [100, 100], [160, 160], 16);
+    guess(old, game, current(old).id);
+    if (i < COUNT - 1) advance(old);
+  }
+  const saved = legacySave(old),
+    total = saved.items.reduce((sum, item) => sum + item.points, 0);
+  const restored = restoreRound(JSON.stringify(saved), game, settings);
+  assert.ok(isEnded(restored));
+  assert.equal(totalScore(restored), total);
+  assert.equal(rankFor(totalScore(restored)), rankFor(total));
+  assert.equal(advance(restored), false);
+  assert.equal(
+    totalScore(restoreRound(serializeRound(restored), game, settings)),
+    total,
+  );
+  saved.items[0].points++;
+  assert.equal(
+    isEnded(restoreRound(JSON.stringify(saved), game, settings)),
+    false,
+  );
 });
 test("wrong guesses cost five, duplicates cost nothing, and image-equivalent names are accepted", () => {
   const round = newRound(game, settings),
@@ -222,6 +319,8 @@ test("corrupted saves, forged scores, future progress and masks outside the crop
     (r) => (r.index = 5),
     (r) => (r.index = 1),
     (r) => (r.items[0].points = 100),
+    (r) => (r.items[0].scoreVersion = 3),
+    (r) => (r.items[0].scoreVersion = null),
     (r) => (r.items[0].erased = 10),
     (r) => (r.items[0].mask = "bad"),
     (r) => (r.items[0].guesses = [-1]),
