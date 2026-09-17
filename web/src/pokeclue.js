@@ -51,6 +51,7 @@ import {
 import { t, initLanguage, getLanguage, pokemonName, typeName } from "./i18n.js";
 import "./style.css";
 import "./pokeclue.css";
+import "./game-resort.css";
 
 const icons = {
   TreePalm,
@@ -172,9 +173,9 @@ function mount() {
     target.addEventListener(event, handler, { signal: controller.signal });
   app.innerHTML = `
     <header class="site-header"><div class="header-inner">${siteBrand()}<nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav></div></header>
-    <main class="main cq-main">
+    <main class="main cq-main resort-main">
       <div id="cq-new-day" class="cq-day-banner" hidden><span>${t("새로운 오늘의 포켓몬이 도착했어요.")}</span><button class="text-button" data-action="daily">${icon("rotate-cw")}${t("오늘의 문제")}</button></div>
-      <section class="cq-heading"><div><div class="eyebrow" id="cq-date"></div><h1>${t("포케클루")}</h1></div><div class="segmented cq-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
+      <section class="cq-heading resort-heading"><div><div class="eyebrow" id="cq-date"></div><h1>${t("포케클루")}</h1></div><div class="segmented cq-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
       <section class="cq-progress" aria-label="${t("현재 기록")}"><div><span>${t("추측 횟수")}</span><strong id="cq-used"></strong></div><div class="cq-best"><span>${t("일치한 단서")}</span><strong id="cq-best"></strong></div><div><span>${t("트레이너")}</span><strong id="cq-grade"></strong></div></section>
       <p id="cq-save-warning" class="cq-warning" role="status" hidden>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
       <section id="cq-answer" class="cq-answer" hidden aria-live="polite"></section>

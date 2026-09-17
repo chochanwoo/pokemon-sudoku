@@ -36,6 +36,7 @@ import { t, getLanguage, initLanguage } from "./i18n.js";
 import { dayKey } from "./engine.js";
 import "./style.css";
 import "./pokinator.css";
+import "./game-resort.css";
 
 const icons = {
   TreePalm,
@@ -242,7 +243,7 @@ function render(focus = false) {
   noteController?.abort();
   view = viewRound(game, round);
   app.innerHTML = `<header class="site-header"><div class="header-inner">${siteBrand()}<nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav></div></header>
-    <main class="main pn-main"><section class="pn-heading"><div><p class="eyebrow">${icon("brain")}${t("역방향 추리")}</p><h1>${t("포키네이터")}</h1></div><span class="pn-counter">${t("문답")} <strong>${view.answered}</strong><span>/ ${MAX_QUESTIONS}</span></span></section>
+    <main class="main pn-main resort-main"><section class="pn-heading resort-heading"><div><p class="eyebrow">${icon("brain")}${t("역방향 추리")}</p><h1>${t("포키네이터")}</h1></div><span class="pn-counter">${t("문답")} <strong>${view.answered}</strong><span>/ ${MAX_QUESTIONS}</span></span></section>
     <div class="pn-progress" role="progressbar" aria-label="${t("진행한 질문")}" aria-valuemin="0" aria-valuemax="${MAX_QUESTIONS}" aria-valuenow="${view.answered}"><span style="width:${(view.answered / MAX_QUESTIONS) * 100}%"></span></div>
     <p id="pn-save-warning" class="pn-warning" role="status" ${storageWarning ? "" : "hidden"}>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
     ${roundUpdated ? `<p class="pn-warning" id="pn-updated" role="status">${t("질문이 업데이트되어 새 문답을 시작했어요. 완료한 기록은 유지됩니다.")}</p>` : ""}

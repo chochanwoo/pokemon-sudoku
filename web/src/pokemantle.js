@@ -51,6 +51,7 @@ import {
 } from "./i18n.js";
 import "./style.css";
 import "./pokemantle.css";
+import "./game-resort.css";
 
 const icons = {
   ScanSearch,
@@ -166,9 +167,9 @@ function mount() {
       ${siteBrand()}
       <nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
     </div></header>
-    <main class="main pm-main">
+    <main class="main pm-main resort-main">
       <div id="new-day" class="pm-day-banner" hidden><span>${t("새로운 오늘의 포켓몬이 도착했어요.")}</span><button class="text-button" data-action="today">${icon("rotate-cw")}${t("오늘의 문제")}</button></div>
-      <section class="pm-heading"><div><div id="pm-date" class="eyebrow"></div><h1 id="pm-title">${t("오늘의 포켓몬")}</h1></div><span class="pm-edition">DAILY<br /><strong>GUESS</strong></span></section>
+      <section class="pm-heading resort-heading"><div><div id="pm-date" class="eyebrow"></div><h1 id="pm-title">${t("오늘의 포켓몬")}</h1></div><span class="pm-edition">DAILY<br /><strong>GUESS</strong></span></section>
       <p id="save-warning" class="pm-warning" role="status" hidden>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
       <section class="pm-summary" aria-label="${t("현재 기록")}"><div><span>${t("시도")}</span><strong id="attempts">0</strong></div><div><span>${t("최고 유사도")}</span><strong id="best-score">-</strong></div><div><span>${t("최고 순위")}</span><strong id="best-rank">-</strong></div></section>
       <section id="answer-panel" class="pm-answer" hidden aria-live="polite"></section>

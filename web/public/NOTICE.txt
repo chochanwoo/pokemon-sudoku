@@ -24,6 +24,8 @@ The Alola theme also reuses the catalog's original Alolan Raichu and Rowlet PNGs
 extracted without modification by scripts/export_alola.mjs.
 The resort panorama (alola-resort.webp) is AI-generated scenery, not official
 Pokemon artwork. Its generation prompt is recorded in scripts/alola-resort-image.md.
+The transparent game foliage (resort-foliage.webp) is also AI-generated,
+not official Pokemon artwork. Its prompt is in scripts/game-resort-image.md.
 Poke Scratch uses the same unchanged sprites. scripts/build_scratch.py reads
 their alpha bounds and pixel identities for cropped rendering and fair scoring;
 no source artwork is altered. Its hub previews show the actual game.

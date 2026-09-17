@@ -51,6 +51,7 @@ import {
 } from "./trainer-results.js";
 import "./style.css";
 import "./scratch.css";
+import "./game-resort.css";
 
 const icons = {
   TreePalm,
@@ -225,9 +226,9 @@ async function mount() {
   const item = current(round),
     p = target();
   app.innerHTML = `<header class="site-header"><div class="header-inner">${siteBrand()}<nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav></div></header>
-  <main class="main sc-main">
+  <main class="main sc-main resort-main">
     <div id="sc-new-day" class="sc-day-banner" hidden><span>${t("새로운 오늘의 그림이 열렸어요.")}</span><button class="text-button" data-action="daily">${t("오늘의 문제")}${icon("arrow-right")}</button></div>
-    <section class="sc-heading"><div><p class="eyebrow">${icon("calendar-days")}${settings.mode === "daily" ? esc(settings.day.replaceAll("-", ".")) : t("연습")}</p><h1>${t("포케 스크래치")}</h1></div><div class="segmented" role="group" aria-label="${t("게임 모드")}">${["daily", "practice"].map((mode) => `<button data-action="${mode}" class="${mode === settings.mode ? "active" : ""}" aria-pressed="${mode === settings.mode}">${t(mode === "daily" ? "데일리" : "연습")}</button>`).join("")}</div></section>
+    <section class="sc-heading resort-heading"><div><p class="eyebrow">${icon("calendar-days")}${settings.mode === "daily" ? esc(settings.day.replaceAll("-", ".")) : t("연습")}</p><h1>${t("포케 스크래치")}</h1></div><div class="segmented" role="group" aria-label="${t("게임 모드")}">${["daily", "practice"].map((mode) => `<button data-action="${mode}" class="${mode === settings.mode ? "active" : ""}" aria-pressed="${mode === settings.mode}">${t(mode === "daily" ? "데일리" : "연습")}</button>`).join("")}</div></section>
     <div class="sc-set-bar"><ol class="sc-steps" aria-label="${t("문제 진행")}">${round.items.map((it, i) => `<li class="${i === round.index ? "current" : ""} ${it.outcome || ""}" ${i === round.index ? 'aria-current="step"' : ""} aria-label="${esc(t("{count}번째 그림", { count: i + 1 }))}${it.outcome ? ` · ${t(it.outcome === "solved" ? "정답" : "포기")}` : ""}">${it.outcome ? icon(it.outcome === "solved" ? "check" : "x") : i + 1}</li>`).join("")}</ol><span class="sc-total-label">${t("합계")} <strong id="sc-total"></strong><span>/ 500</span></span></div>
     <p class="sc-warning" id="sc-save-warning" role="status" ${warning ? "" : "hidden"}>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
     <section class="sc-play" aria-label="${t("그림 추리")}"><div class="sc-picture-column">
@@ -334,13 +335,23 @@ function bindCanvas(on) {
     overlay = ctx.createImageData(SIZE, SIZE),
     item = current(round),
     [x, y, w, h] = target().frame;
+  // Use position-only sand colors; the saved mask remains the sole alpha source.
   for (let py = y; py < y + h; py++)
     for (let px = x; px < x + w; px++) {
       const i = py * SIZE + px,
         offset = i * 4,
-        shade = (px + py) % 16 < 2 ? 205 : 222;
+        grain =
+          ((Math.imul(px + 1, 374761393) ^ Math.imul(py + 1, 668265263)) >>> 0) %
+            17 -
+          8,
+        ripple = Math.round(3 * Math.sin(py / 9 + Math.sin(px / 28)));
       overlay.data.set(
-        [shade, shade + 3, shade + 4, item.mask[i] || item.outcome ? 0 : 255],
+        [
+          233 + grain + ripple,
+          215 + grain + ripple,
+          177 + grain + ripple,
+          item.mask[i] || item.outcome ? 0 : 255,
+        ],
         offset,
       );
     }

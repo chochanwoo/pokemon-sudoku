@@ -58,6 +58,7 @@ import {
   getLanguage,
 } from "./i18n.js";
 import "./style.css";
+import "./game-resort.css";
 
 const icons = {
   Grid2X2,
@@ -183,8 +184,8 @@ function mount() {
       ${siteBrand()}
       <nav class="header-actions" aria-label="${tr("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav>
     </div></header>
-    <main class="main">
-      <section class="game-heading">
+    <main class="main resort-main">
+      <section class="game-heading resort-heading">
         <div><div class="eyebrow" id="eyebrow"></div><h1 id="game-title">${tr("오늘의 타입 퍼즐")}</h1></div>
         <div class="segmented mode-switch" aria-label="${tr("게임 모드")}"><button data-mode="daily">${tr("오늘의 퍼즐")}</button><button data-mode="free">${tr("자유 플레이")}</button></div>
       </section>

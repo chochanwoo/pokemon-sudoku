@@ -160,6 +160,21 @@ test("the cover is opaque, real pixels render, and unique erased area survives r
   await ready(page);
   const target = game.byId.get(game.targets(practice)[0]);
   expect((await pixels(page)).opaque).toBe(area(target));
+  const sand = await page.locator("#sc-mask").evaluate((el) => {
+    const data = el.getContext("2d").getImageData(0, 0, 256, 256).data;
+    const shades = new Set();
+    let translucent = 0, warm = true;
+    for (let i = 0; i < data.length; i += 4) {
+      if (!data[i + 3]) continue;
+      translucent += data[i + 3] !== 255;
+      warm &&= data[i] > data[i + 1] && data[i + 1] > data[i + 2];
+      shades.add(data[i]);
+    }
+    return { shades: shades.size, translucent, warm };
+  });
+  expect(sand.warm).toBe(true);
+  expect(sand.shades).toBeGreaterThan(10);
+  expect(sand.translucent).toBe(0);
   expect((await pixels(page, "sc-picture")).color).toBeGreaterThan(1000);
   await expect(page.locator("#sc-points")).toHaveText("100");
   await stroke(page, [0, 0], [0, 0]);

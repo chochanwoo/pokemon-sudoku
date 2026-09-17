@@ -46,6 +46,7 @@ import {
 } from "./trainer-results.js";
 import "./style.css";
 import "./highlow.css";
+import "./game-resort.css";
 
 const icons = {
   TreePalm,
@@ -179,9 +180,9 @@ function mount() {
   const on = (target, event, handler) =>
     target.addEventListener(event, handler, { signal: controller.signal });
   app.innerHTML = `<header class="site-header"><div class="header-inner">${siteBrand()}<nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav></div></header>
-  <main class="main hl-main">
+  <main class="main hl-main resort-main">
     <div class="hl-day-banner" id="hl-new-day" hidden><span>${t("새로운 오늘의 대결이 열렸어요.")}</span><button class="text-button" data-action="daily">${icon("rotate-cw")}${t("오늘의 문제")}</button></div>
-    <section class="hl-heading"><div><div class="eyebrow" id="hl-date"></div><h1>${t("포케 하이로우")}</h1></div><div class="segmented hl-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
+    <section class="hl-heading resort-heading"><div><div class="eyebrow" id="hl-date"></div><h1>${t("포케 하이로우")}</h1></div><div class="segmented hl-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
     <div class="hl-summary" aria-label="${t("현재 기록")}"><div class="hl-streak">${icon("flame")}<span>${t("연속 정답")}<strong id="hl-streak">0</strong></span></div><div class="hl-best">${icon("trophy")}<span>${t("내 최고")}<strong id="hl-best">0</strong></span></div></div>
     <p class="hl-warning" id="hl-save-warning" role="status" hidden>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
     <section id="hl-arena" aria-labelledby="hl-question"><div class="hl-question-heading"><span id="hl-round-number"></span><h2 id="hl-question"></h2></div><div id="hl-duel" class="hl-duel"></div></section>
