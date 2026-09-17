@@ -29,6 +29,18 @@ test("Alola masthead keeps real sprites and the first game visible in both langu
   expect(panorama.local).toBe(true);
   for (const language of ["ko", "en"]) {
     await chooseLanguage(page, language);
+    expect(
+      await page.locator(".game-card").evaluateAll((cards) =>
+        cards.map((card) => card.getAttribute("href")),
+      ),
+    ).toEqual([
+      "./pokemantle.html",
+      "./scratch.html",
+      "./pokeclue.html",
+      "./highlow.html",
+      "./sudoku.html",
+      "./pokinator.html",
+    ]);
     await expect(page.locator(".hub-heading")).toHaveText(
       language === "ko" ? "전체 게임" : "All games",
     );
@@ -235,7 +247,7 @@ test("game library is responsive, uses a real local preview and does not start S
   );
   for (const width of [320, 390, 800, 1440]) {
     await page.setViewportSize({ width, height: width < 800 ? 844 : 1080 });
-    const bounds = await game.evaluate(async (card) => {
+    const bounds = await page.locator(".game-card").first().evaluate(async (card) => {
       const image = card.querySelector("img");
       await image.decode();
       const canvas = document.createElement("canvas");

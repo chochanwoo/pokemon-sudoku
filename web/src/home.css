@@ -106,23 +106,23 @@
     border-color 150ms,
     box-shadow 150ms;
 }
-.game-card:nth-child(2) {
+.game-card[data-game="pokemantle"] {
   --cover: #e5e5f3;
   --tile-accent: #666090;
 }
-.game-card:nth-child(3) {
+.game-card[data-game="pokeclue"] {
   --cover: #dceef4;
   --tile-accent: #3c7288;
 }
-.game-card:nth-child(4) {
+.game-card[data-game="highlow"] {
   --cover: #f7e4dc;
   --tile-accent: #a75b47;
 }
-.game-card:nth-child(5) {
+.game-card[data-game="pokinator"] {
   --cover: #e6edce;
   --tile-accent: #657830;
 }
-.game-card:nth-child(6) {
+.game-card[data-game="scratch"] {
   --cover: #f7edc7;
   --tile-accent: #8f702b;
 }

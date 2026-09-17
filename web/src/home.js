@@ -38,7 +38,7 @@ function renderHome() {
         <div class="game-library">${games
           .map(
             (game) => `
-          <a class="game-card" href="${game.href}" aria-labelledby="${game.id}-title ${game.id}-play">
+          <a class="game-card" data-game="${game.id}" href="${game.href}" aria-labelledby="${game.id}-title ${game.id}-play">
             <div class="game-cover"><img src="${getLanguage() === "en" ? game.imageEn : game.image}" alt="${t(game.imageAlt)}" width="540" height="620" /></div>
             <div class="game-card-content">
               <span class="game-category">${t(game.category)}</span>

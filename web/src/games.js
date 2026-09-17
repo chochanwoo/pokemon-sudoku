@@ -13,16 +13,6 @@ import scratchPreviewEn from "./assets/scratch-preview-en.png";
 
 export const games = [
   {
-    id: "typedoku",
-    title: "타입도쿠",
-    category: "스도쿠",
-    formats: "4 × 4 · 6 × 6 · 9 × 9",
-    href: "./sudoku.html",
-    image: typedokuPreview,
-    imageEn: typedokuPreviewEn,
-    imageAlt: "포켓몬과 타입 아이콘이 배치된 타입도쿠 4 × 4 보드",
-  },
-  {
     id: "pokemantle",
     title: "포맨틀",
     category: "유사도 추리",
@@ -31,6 +21,16 @@ export const games = [
     image: pokemantlePreview,
     imageEn: pokemantlePreviewEn,
     imageAlt: "추측한 포켓몬의 유사도와 순위가 표시된 포맨틀 기록",
+  },
+  {
+    id: "scratch",
+    title: "포케 스크래치",
+    category: "그림 추리",
+    formats: "데일리 · 연습",
+    href: "./scratch.html",
+    image: scratchPreview,
+    imageEn: scratchPreviewEn,
+    imageAlt: "일부를 지운 가림막 아래 포켓몬을 추측하는 포케 스크래치 화면",
   },
   {
     id: "pokeclue",
@@ -53,6 +53,16 @@ export const games = [
     imageAlt: "두 포켓몬의 종족값을 비교하는 포케 하이로우 대결",
   },
   {
+    id: "typedoku",
+    title: "타입도쿠",
+    category: "스도쿠",
+    formats: "4 × 4 · 6 × 6 · 9 × 9",
+    href: "./sudoku.html",
+    image: typedokuPreview,
+    imageEn: typedokuPreviewEn,
+    imageAlt: "포켓몬과 타입 아이콘이 배치된 타입도쿠 4 × 4 보드",
+  },
+  {
     id: "pokinator",
     title: "포키네이터",
     category: "역방향 추리",
@@ -61,15 +71,5 @@ export const games = [
     image: pokinatorPreview,
     imageEn: pokinatorPreviewEn,
     imageAlt: "포키네이터의 질문에 예, 아니오, 모르겠습니다로 답하는 화면",
-  },
-  {
-    id: "scratch",
-    title: "포케 스크래치",
-    category: "그림 추리",
-    formats: "데일리 · 연습",
-    href: "./scratch.html",
-    image: scratchPreview,
-    imageEn: scratchPreviewEn,
-    imageAlt: "일부를 지운 가림막 아래 포켓몬을 추측하는 포케 스크래치 화면",
   },
 ];
