@@ -47,6 +47,11 @@ test("translations preserve placeholders and cover literal UI message keys", () 
     assert.ok(translated && !/[가-힣]/.test(translated), source);
     assert.deepEqual(params(translated), params(source), source);
   }
+  for (const [, key] of read("../web/src/games.js").matchAll(
+    /(?:title|category|imageAlt): "([^"\n]+)"/g,
+  )) {
+    assert.ok(Object.hasOwn(english, key), `games.js: ${key}`);
+  }
   for (const file of [
     "main.js",
     "home.js",

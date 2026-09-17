@@ -105,7 +105,7 @@ test("hover erasing works without a click and never intercepts search or menu ke
   expect(await pixels(page)).toEqual(editing);
 });
 
-test("scratch is the sixth bilingual hub game, with real previews and only local assets", async ({
+test("scratch has language-neutral hub artwork and only local assets", async ({
   page,
 }) => {
   const errors = [],
@@ -118,13 +118,13 @@ test("scratch is the sixth bilingual hub game, with real previews and only local
     name: "포케 스크래치 플레이",
     exact: true,
   });
-  const ko = await card.locator("img").getAttribute("src");
+  const ko = await card.locator(".game-cover-background").getAttribute("src");
   await expect
-    .poll(() => card.locator("img").evaluate((img) => img.naturalWidth))
+    .poll(() => card.locator(".game-cover-background").evaluate((img) => img.naturalWidth))
     .toBeGreaterThan(300);
   await chooseLanguage(page, "en");
   const en = page.getByRole("link", { name: "Poke Scratch Play", exact: true });
-  expect(await en.locator("img").getAttribute("src")).not.toBe(ko);
+  expect(await en.locator(".game-cover-background").getAttribute("src")).toBe(ko);
   await en.click();
   await ready(page);
   await expect(page).toHaveTitle("Poke Scratch | Pokemon Quiz");

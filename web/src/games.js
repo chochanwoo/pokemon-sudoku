@@ -1,15 +1,9 @@
-import typedokuPreview from "./assets/typedoku-preview.png";
-import pokemantlePreview from "./assets/pokemantle-preview.png";
-import typedokuPreviewEn from "./assets/typedoku-preview-en.png";
-import pokemantlePreviewEn from "./assets/pokemantle-preview-en.png";
-import pokecluePreview from "./assets/pokeclue-preview.png";
-import pokecluePreviewEn from "./assets/pokeclue-preview-en.png";
-import highlowPreview from "./assets/highlow-preview.png";
-import highlowPreviewEn from "./assets/highlow-preview-en.png";
-import pokinatorPreview from "./assets/pokinator-preview.png";
-import pokinatorPreviewEn from "./assets/pokinator-preview-en.png";
-import scratchPreview from "./assets/scratch-preview.png";
-import scratchPreviewEn from "./assets/scratch-preview-en.png";
+import typedokuArt from "./assets/home-art/typedoku.webp";
+import pokemantleArt from "./assets/home-art/pokemantle.webp";
+import pokeclueArt from "./assets/home-art/pokeclue.webp";
+import highlowArt from "./assets/home-art/highlow.webp";
+import pokinatorArt from "./assets/home-art/pokinator.webp";
+import scratchArt from "./assets/home-art/scratch.webp";
 
 export const games = [
   {
@@ -18,9 +12,8 @@ export const games = [
     category: "유사도 추리",
     formats: "데일리",
     href: "./pokemantle.html",
-    image: pokemantlePreview,
-    imageEn: pokemantlePreviewEn,
-    imageAlt: "추측한 포켓몬의 유사도와 순위가 표시된 포맨틀 기록",
+    image: pokemantleArt,
+    imageAlt: "바닷가 추리 테이블에 펼친 이브이, 샤미드, 쥬피썬더 사진",
   },
   {
     id: "scratch",
@@ -28,9 +21,8 @@ export const games = [
     category: "그림 추리",
     formats: "데일리 · 연습",
     href: "./scratch.html",
-    image: scratchPreview,
-    imageEn: scratchPreviewEn,
-    imageAlt: "일부를 지운 가림막 아래 포켓몬을 추측하는 포케 스크래치 화면",
+    image: scratchArt,
+    imageAlt: "지우개 옆 그림판의 긁힌 틈으로 드러난 피카츄",
   },
   {
     id: "pokeclue",
@@ -38,9 +30,8 @@ export const games = [
     category: "단서 추리",
     formats: "데일리 · 연습",
     href: "./pokeclue.html",
-    image: pokecluePreview,
-    imageEn: pokecluePreviewEn,
-    imageAlt: "타입과 특성 등 여섯 가지 단서를 비교한 포케클루 추측 기록",
+    image: pokeclueArt,
+    imageAlt: "나몰빼미와 타입, 알, 진화 단서를 담은 조사 노트",
   },
   {
     id: "highlow",
@@ -48,9 +39,8 @@ export const games = [
     category: "종족값 대결",
     formats: "데일리 · 연습",
     href: "./highlow.html",
-    image: highlowPreview,
-    imageEn: highlowPreviewEn,
-    imageAlt: "두 포켓몬의 종족값을 비교하는 포케 하이로우 대결",
+    image: highlowArt,
+    imageAlt: "바다가 보이는 높고 낮은 받침대 위의 어흥염과 루가루암",
   },
   {
     id: "typedoku",
@@ -58,9 +48,8 @@ export const games = [
     category: "스도쿠",
     formats: "4 × 4 · 6 × 6 · 9 × 9",
     href: "./sudoku.html",
-    image: typedokuPreview,
-    imageEn: typedokuPreviewEn,
-    imageAlt: "포켓몬과 타입 아이콘이 배치된 타입도쿠 4 × 4 보드",
+    image: typedokuArt,
+    imageAlt: "리조트 테이블에 놓인 컬러 타입 타일 스도쿠",
   },
   {
     id: "pokinator",
@@ -68,8 +57,7 @@ export const games = [
     category: "역방향 추리",
     formats: "자유 플레이",
     href: "./pokinator.html",
-    image: pokinatorPreview,
-    imageEn: pokinatorPreviewEn,
-    imageAlt: "포키네이터의 질문에 예, 아니오, 모르겠습니다로 답하는 화면",
+    image: pokinatorArt,
+    imageAlt: "바닷가 라운지에서 숟가락을 들고 추리하는 윤겔라",
   },
 ];

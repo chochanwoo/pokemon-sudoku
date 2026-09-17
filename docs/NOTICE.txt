@@ -36,8 +36,15 @@ The transparent game foliage (resort-foliage.webp) is also AI-generated,
 not official Pokemon artwork. Its prompt is in scripts/game-resort-image.md.
 Poke Scratch uses the same unchanged sprites. scripts/build_scratch.py reads
 their alpha bounds and pixel identities for cropped rendering and fair scoring;
-no source artwork is altered. Its hub previews show the actual game.
-Its homepage previews are screenshots of the actual game, in Korean and English.
+no source artwork is altered.
+The homepage's six activity backgrounds are AI-generated resort illustrations.
+They are decorative game covers, not screenshots or official Pokemon scenery.
+Pokemon artwork on these covers comes from PokeAPI/sprites, under
+sprites/pokemon/other/official-artwork (25, 64, 133, 134, 135, 722, 727, 745).
+WebP files are resized/encoded copies; characters are not redrawn.
+The website positions the artwork over separate backgrounds, using CSS clipping
+for the scratch preview and the existing MIT-licensed type icons for the puzzle.
+Prompts and asset details: scripts/home-art-images.md.
 Pokinator's separate base/regional/Mega answer pool and question matrix are built
 from the read-only PokeAPI-derived database by scripts/build_pokinator.py.
 Species-level appearance is intentionally unknown for regional and Mega forms.

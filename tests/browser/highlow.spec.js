@@ -78,13 +78,13 @@ test("High Low is the fourth localized hub game and runs under a nested Pages pa
     exact: true,
   });
   await expect(card).toHaveAttribute("href", "./highlow.html");
-  const ko = await card.locator("img").getAttribute("src");
+  const ko = await card.locator(".game-cover-background").getAttribute("src");
   await chooseLanguage(page, "en");
   const en = page.getByRole("link", {
     name: "Poke High Low Play",
     exact: true,
   });
-  expect(await en.locator("img").getAttribute("src")).not.toBe(ko);
+  expect(await en.locator(".game-cover-background").getAttribute("src")).toBe(ko);
   await en.click();
   await expect(page).toHaveTitle("Poke High Low | Pokemon Quiz");
   await expectPair(page, daily, 0);

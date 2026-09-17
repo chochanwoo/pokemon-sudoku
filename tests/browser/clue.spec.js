@@ -42,7 +42,7 @@ async function reveal(page) {
   await page.locator('[data-action="reveal"]').click();
 }
 
-test("the new hub card has real localized previews and both navigation directions preserve progress", async ({
+test("the hub card has shared artwork with localized labels and navigation preserves progress", async ({
   page,
 }) => {
   await page.goto("./");
@@ -51,7 +51,7 @@ test("the new hub card has real localized previews and both navigation direction
   const card = page.getByRole("link", { name: "포케클루 플레이", exact: true });
   await expect(card).toHaveAttribute("href", "./pokeclue.html");
   await expect(card.locator(".game-formats")).toHaveCount(0);
-  const koImage = await card.locator("img").getAttribute("src");
+  const koImage = await card.locator(".game-cover-background").getAttribute("src");
   for (const width of [320, 390, 800, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     const fit = await card.evaluate(async (el) => {
@@ -80,7 +80,7 @@ test("the new hub card has real localized previews and both navigation direction
     name: "PokeClue Play",
     exact: true,
   });
-  expect(await english.locator("img").getAttribute("src")).not.toBe(koImage);
+  expect(await english.locator(".game-cover-background").getAttribute("src")).toBe(koImage);
   await english.click();
   await expect(page).toHaveTitle("PokeClue | Pokemon Quiz");
   await guess(page, "bulbasaur");

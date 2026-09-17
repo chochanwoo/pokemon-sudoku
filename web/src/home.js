@@ -5,10 +5,12 @@ import {
   Languages,
   ChevronDown,
   Check,
+  Egg,
 } from "lucide";
 import { games } from "./games.js";
+import { homeArt } from "./home-art.js";
 import { siteBrand, languagePicker } from "./site-brand.js";
-import { t, initLanguage, getLanguage } from "./i18n.js";
+import { t, initLanguage } from "./i18n.js";
 import raichu from "./assets/alola-raichu.png";
 import rowlet from "./assets/alola-rowlet.png";
 import resort from "./assets/alola-resort.webp";
@@ -39,7 +41,10 @@ function renderHome() {
           .map(
             (game) => `
           <a class="game-card" data-game="${game.id}" href="${game.href}" aria-labelledby="${game.id}-title ${game.id}-play">
-            <div class="game-cover"><img src="${getLanguage() === "en" ? game.imageEn : game.image}" alt="${t(game.imageAlt)}" width="540" height="620" /></div>
+            <div class="game-cover" role="img" aria-label="${t(game.imageAlt)}"><div class="cover-scene" aria-hidden="true">
+              <img class="game-cover-background" src="${game.image}" alt="" width="800" height="450" draggable="false" />
+              ${homeArt(game.id)}
+            </div></div>
             <div class="game-card-content">
               <span class="game-category">${t(game.category)}</span>
               <h2 id="${game.id}-title">${t(game.title)}</h2>
@@ -52,7 +57,7 @@ function renderHome() {
       <footer class="footer hub-footer"><span>${t("포켓몬 퀴즈")} <span class="footer-dot">·</span> ${t("비공식 팬 게임")}</span><a href="https://pokeapi.co/" target="_blank" rel="noreferrer">${t("데이터 · PokéAPI")} <i data-lucide="arrow-right" aria-hidden="true"></i></a></footer>
     </main>`;
   createIcons({
-    icons: { TreePalm, ArrowRight, Languages, ChevronDown, Check },
+    icons: { TreePalm, ArrowRight, Languages, ChevronDown, Check, Egg },
     attrs: { "stroke-width": 1.8 },
   });
 }

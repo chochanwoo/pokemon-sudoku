@@ -119,19 +119,19 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("the fifth hub game has real bilingual previews and the shared brand returns home", async ({
+test("Pokinator has language-neutral artwork and the shared brand returns home", async ({
   page,
 }) => {
   await page.goto("./");
   await expect(page.locator(".game-card")).toHaveCount(6);
   const card = page.locator('.game-card[href="./pokinator.html"]');
   await expect(card.locator("h2")).toHaveText("포키네이터");
-  const ko = await card.locator("img").getAttribute("src");
+  const ko = await card.locator(".game-cover-background").getAttribute("src");
   await chooseLanguage(page, "en");
   await expect(card.locator("h2")).toHaveText("Pokinator");
-  expect(await card.locator("img").getAttribute("src")).not.toBe(ko);
+  expect(await card.locator(".game-cover-background").getAttribute("src")).toBe(ko);
   expect(
-    await card.locator("img").evaluate(async (img) => {
+    await card.locator(".game-cover-background").evaluate(async (img) => {
       await img.decode();
       return img.naturalWidth;
     }),

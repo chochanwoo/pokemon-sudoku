@@ -1,5 +1,17 @@
 // Korean source messages are the default locale and the translation keys.
 export default {
+  "바닷가 추리 테이블에 펼친 이브이, 샤미드, 쥬피썬더 사진":
+    "Eevee, Vaporeon and Jolteon photos on a seaside detective's desk",
+  "지우개 옆 그림판의 긁힌 틈으로 드러난 피카츄":
+    "Pikachu revealed through a scratched drawing board beside an eraser",
+  "나몰빼미와 타입, 알, 진화 단서를 담은 조사 노트":
+    "A field notebook with Rowlet and clues about types, eggs and evolution",
+  "바다가 보이는 높고 낮은 받침대 위의 어흥염과 루가루암":
+    "Incineroar and Lycanroc on high and low pedestals overlooking the sea",
+  "리조트 테이블에 놓인 컬러 타입 타일 스도쿠":
+    "A sudoku of colorful type tiles on a resort table",
+  "바닷가 라운지에서 숟가락을 들고 추리하는 윤겔라":
+    "Kadabra holding a spoon and pondering in a seaside lounge",
   "포켓몬 타입 스도쿠를 완성해보세요!": "Complete the Pokemon type sudoku!",
   "주어진 포켓몬은 바꿀 수 없습니다.": "The given Pokemon stay where they are.",
   "같은 타입 조합이라도 서로 다른 포켓몬이면 사용할 수 있습니다.":
