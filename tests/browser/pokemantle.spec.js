@@ -82,7 +82,7 @@ test("regional forms are distinct answers; keyboard guessing, duplicate preventi
   await expect(page.locator("#best-rank")).toHaveText("1위");
   await expect(input).toBeHidden();
   await expect(page.locator("#pm-dialog .trainer-award-title")).toHaveText(
-    "레드급",
+    "알로라 챔피언",
   );
   await page.keyboard.press("Escape");
   await page.evaluate(() =>

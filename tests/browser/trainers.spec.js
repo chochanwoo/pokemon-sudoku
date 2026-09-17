@@ -104,7 +104,7 @@ async function realGuess(page, setup, id) {
 }
 
 for (const setup of setups) {
-  const sixthGuessRank = `${trainerFor(setup.sixthGuessRank, resultKey(setup, 6)).ko}급`;
+  const sixthGuessRank = `${trainerFor(setup.sixthGuessRank, resultKey(setup, 6)).ko}`;
   test(`${setup.name}: a new win opens the trainer popup once, counts hints, shares without the answer and restores focus`, async ({
     page,
   }) => {
@@ -172,8 +172,8 @@ for (const setup of setups) {
       const attempts = setup.tierAttempts[index];
       const trainer = trainerFor(rank, resultKey(setup, attempts));
       const { sprite } = trainer;
-      const ko = `${trainer.ko}급`,
-        en = `${trainer.en} tier`;
+      const ko = `${trainer.ko}`,
+        en = `${trainer.en}`;
       await seed(
         page,
         setup,
@@ -197,8 +197,8 @@ for (const setup of setups) {
         if (rank === "E")
           await expect(popup.locator(".trainer-taunt")).toHaveText(
             language === "ko"
-              ? "꼬마야, 더 배우고 와~"
-              : "Hey kid, come back after some more training~",
+              ? "배틀보다는 휴양하러 오셨군요?"
+              : "Here for a vacation rather than a battle?",
           );
         else await expect(popup.locator(".trainer-taunt")).toHaveCount(0);
         await expect(popup.locator("[data-trainer-rank]")).toHaveAttribute(
@@ -287,7 +287,7 @@ for (const setup of setups) {
       .locator('[data-language-option="en"]')
       .evaluate((el) => el.click());
     await expect(popup).toBeVisible();
-    await expect(popup.locator(".trainer-award-title")).toHaveText("Red tier");
+    await expect(popup.locator(".trainer-award-title")).toHaveText("Alola Champion");
     await page.evaluate(() => {
       Object.defineProperty(navigator, "share", {
         configurable: true,
@@ -304,7 +304,7 @@ for (const setup of setups) {
     });
     await popup.locator('[data-action="share-award"]').click();
     await expect(page.locator(`${setup.dialog} .share-text`)).toContainText(
-      "Red tier",
+      "Alola Champion",
     );
     await expect(page.locator(setup.dialog)).not.toHaveClass(/trainer-dialog/);
     await page.keyboard.press("Escape");
@@ -337,7 +337,7 @@ for (const setup of setups) {
     await expect(portrait.locator(".trainer-image-fallback")).toBeVisible();
     await expect(
       page.locator(`${setup.dialog} .trainer-award-title`),
-    ).toHaveText("레드급");
+    ).toHaveText("알로라 챔피언");
     await page.keyboard.press("Escape");
     await expect(page.locator('[data-action="trainer-result"]')).toBeFocused();
   });

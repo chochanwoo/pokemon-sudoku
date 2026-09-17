@@ -23,7 +23,7 @@ const esc = (value) =>
 const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 export const rankName = (rank, resultKey = "") => {
   const trainer = trainerFor(rank, resultKey);
-  return trainer ? t("{trainer}급", { trainer: trainer[getLanguage()] }) : "-";
+  return trainer ? trainer[getLanguage()] : "-";
 };
 
 function portrait(rank, resultKey = "") {
@@ -48,7 +48,7 @@ export function trainerReplay(rank, extraClass = "", resultKey = "") {
 
 export function trainerTaunt(rank) {
   return rank === "E"
-    ? `<p class="trainer-taunt">${esc(t("꼬마야, 더 배우고 와~"))}</p>`
+    ? `<p class="trainer-taunt">${esc(t("배틀보다는 휴양하러 오셨군요?"))}</p>`
     : "";
 }
 

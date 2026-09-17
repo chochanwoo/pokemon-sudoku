@@ -258,7 +258,7 @@ test("text-only bilingual search, IME handling, wrong guesses and duplicates pre
   await expect(page.locator("#sc-points")).toHaveText("100");
 });
 
-test("five solved pictures award Red, share no answers and store a single completed record", async ({
+test("five solved pictures award Selene, share no answers and store a single completed record", async ({
   page,
 }) => {
   await page.goto(path);
@@ -270,8 +270,16 @@ test("five solved pictures award Red, share no answers and store a single comple
   await expect(page.locator("#sc-dialog")).toBeVisible();
   await expect(page.locator(".sc-award .trainer-badge")).toHaveAttribute(
     "data-trainer-id",
-    "red",
+    "selene",
   );
+  await expect(page.locator(".sc-award .trainer-badge")).toHaveText("알로라 챔피언");
+  await act(page, "close-dialog").first().click();
+  await chooseLanguage(page, "en");
+  await act(page, "result").click();
+  await expect(page.locator(".sc-award .trainer-badge")).toHaveText("Alola Champion");
+  await act(page, "close-dialog").first().click();
+  await chooseLanguage(page, "ko");
+  await act(page, "result").click();
   await expect
     .poll(() =>
       page.locator(".sc-award img").evaluate((img) => img.naturalWidth),
@@ -289,13 +297,14 @@ test("five solved pictures award Red, share no answers and store a single comple
   });
   await act(page, "share").click();
   const shared = await page.evaluate(() => window.sharedResult);
+  expect(shared.split("\n")[1]).toBe("알로라 챔피언 · 500/500");
   expect(shared).toContain("500/500");
   for (const id of game.targets(practice))
     expect(shared).not.toContain(game.byId.get(id).name);
   expect(new URL(shared.split("\n").at(-1)).searchParams.get("seed")).toBe(
     practice.seed,
   );
-  await page.screenshot({ path: ".preview/scratch-red.png" });
+  await page.screenshot({ path: ".preview/scratch-champion.png" });
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 700 });
     expect(
@@ -304,7 +313,7 @@ test("five solved pictures award Red, share no answers and store a single comple
         .evaluate((el) => el.scrollWidth <= el.clientWidth),
     ).toBe(true);
     await expect(act(page, "share")).toBeInViewport();
-    await page.screenshot({ path: `.preview/scratch-red-${width}.png` });
+    await page.screenshot({ path: `.preview/scratch-champion-${width}.png` });
   }
   await page.reload();
   await expect(page.locator("#sc-dialog")).not.toBeVisible();
@@ -314,7 +323,7 @@ test("five solved pictures award Red, share no answers and store a single comple
   await expect(page.locator(".sc-records > div")).toHaveCount(1);
 });
 
-test("revealing needs confirmation, gives zero, and Joey's result includes the taunt", async ({
+test("revealing needs confirmation, gives zero, and Tourist's result includes the taunt", async ({
   page,
 }) => {
   await page.goto(path);
@@ -330,10 +339,10 @@ test("revealing needs confirmation, gives zero, and Joey's result includes the t
   }
   await expect(page.locator(".sc-award .trainer-badge")).toHaveAttribute(
     "data-trainer-id",
-    "joey",
+    "tourist",
   );
   await expect(page.locator(".trainer-taunt")).toHaveText(
-    "꼬마야, 더 배우고 와~",
+    "배틀보다는 휴양하러 오셨군요?",
   );
   await page.evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {

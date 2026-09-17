@@ -40,7 +40,7 @@ const settings = { mode: "daily", day: "2026-09-11" };
 const opposite = (side) => (side === "left" ? "right" : "left");
 const restore = (value) => restoreRound(JSON.stringify(value), game, settings);
 
-test("streak ranks preserve every total-stat boundary", () => {
+test("streak ranks restore the Champion boundary and preserve the lower boundaries", () => {
   const thresholds = [20, 15, 10, 6, 3, 0];
   assert.deepEqual(
     HIGHLOW_STREAK_RANKS.map((t) => t.min),

@@ -93,8 +93,8 @@ test("every streak tier renders the original sprite and localizes legacy records
     await seed(page, settings, tier.min);
     await expect(page.locator("#hl-dialog")).toBeHidden();
     for (const [language, name] of [
-      ["ko", `${trainer.ko}급`],
-      ["en", `${trainer.en} tier`],
+      ["ko", `${trainer.ko}`],
+      ["en", `${trainer.en}`],
     ]) {
       await chooseLanguage(page, language);
       await expect(page.locator("#hl-feedback .trainer-badge")).toContainText(
@@ -113,8 +113,8 @@ test("every streak tier renders the original sprite and localizes legacy records
       if (tier.rank === "E")
         await expect(page.locator("#hl-dialog .trainer-taunt")).toHaveText(
           language === "ko"
-            ? "꼬마야, 더 배우고 와~"
-            : "Hey kid, come back after some more training~",
+            ? "배틀보다는 휴양하러 오셨군요?"
+            : "Here for a vacation rather than a battle?",
         );
       else
         await expect(page.locator("#hl-dialog .trainer-taunt")).toHaveCount(0);
@@ -172,7 +172,7 @@ test("every streak tier renders the original sprite and localizes legacy records
           );
         });
         expect(fit).toBe(true);
-        if (index === 0 || index === 5)
+        if (index === 0 || index === HIGHLOW_STREAK_RANKS.length - 1)
           await page.screenshot({
             path: `.preview/highlow-rank-${tier.rank}-${language}-${width}.png`,
           });
@@ -223,7 +223,7 @@ test("all middle-tier candidates appear across challenges and retain their ident
         trainer.id,
       );
       await expect(page.locator(".hl-award-badge")).toHaveText(
-        `${trainer.ko}급`,
+        `${trainer.ko}`,
       );
       await expect(page.locator("#hl-dialog .trainer-taunt")).toHaveCount(0);
       const pixels = await page
@@ -246,7 +246,7 @@ test("all middle-tier candidates appear across challenges and retain their ident
         .locator('[data-language-option="en"]')
         .evaluate((el) => el.click());
       await expect(page.locator(".hl-award-badge")).toHaveText(
-        `${trainer.en} tier`,
+        `${trainer.en}`,
       );
       await expect(page.locator(".hl-award-badge")).toHaveAttribute(
         "data-trainer-id",
@@ -268,7 +268,7 @@ test("all middle-tier candidates appear across challenges and retain their ident
       });
       await page.locator('#hl-dialog [data-action="share"]').click();
       expect(await page.evaluate(() => window.poolShare)).toContain(
-        `${trainer.en} tier`,
+        `${trainer.en}`,
       );
       await page.keyboard.press("Escape");
       await page.reload();
@@ -278,7 +278,7 @@ test("all middle-tier candidates appear across challenges and retain their ident
       );
       await page.locator("#hl-result").click();
       await expect(page.locator(".hl-award-badge")).toHaveText(
-        `${trainer.en} tier`,
+        `${trainer.en}`,
       );
       await page.keyboard.press("Escape");
       await page.locator('[data-action="stats"]').click();
@@ -311,7 +311,7 @@ test("a fresh finish awards only correct picks, shares the rank and never repeat
     .locator(`[data-choice="${other(game.question(settings, 20).winner)}"]`)
     .click();
   await expect(page.locator("#hl-dialog")).toBeVisible();
-  await expect(page.locator(".hl-award-badge")).toContainText("레드급");
+  await expect(page.locator(".hl-award-badge")).toContainText("알로라 챔피언");
   await expect(page.locator(".hl-result-summary > strong")).toHaveText("20");
   await page.evaluate(() =>
     Object.defineProperty(navigator, "clipboard", {
@@ -325,18 +325,18 @@ test("a fresh finish awards only correct picks, shares the rank and never repeat
   );
   await page.locator('[data-action="share"]').click();
   const shared = await page.evaluate(() => window.sharedRank);
-  expect(shared.split("\n")[1]).toBe("레드급 · 20연속 정답");
+  expect(shared.split("\n")[1]).toBe("알로라 챔피언 · 20연속 정답");
   expect(
     new URL(shared.split("\n").at(-1)).searchParams.get("difficulty"),
   ).toBeNull();
   await page.reload();
   await expect(page.locator("#hl-dialog")).toBeHidden();
   await expect(page.locator("#hl-feedback .trainer-badge")).toContainText(
-    "레드급",
+    "알로라 챔피언",
   );
   await chooseLanguage(page, "en");
   await page.locator("#hl-result").click();
-  await expect(page.locator(".hl-award-badge")).toContainText("Red tier");
+  await expect(page.locator(".hl-award-badge")).toContainText("Alola Champion");
   await page.keyboard.press("Escape");
   await page.locator('[data-action="new-practice"]').click();
   await expect(page.locator("#hl-feedback .trainer-badge")).toHaveCount(0);
@@ -349,7 +349,7 @@ test("missing trainer artwork has a stable fallback and the result stays usable 
   await page.goto(path);
   await seed(page, base, 0);
   await page.locator("#hl-result").click();
-  await expect(page.locator(".hl-award-badge")).toContainText("오성급");
+  await expect(page.locator(".hl-award-badge")).toContainText("알로라 관광객");
   const portrait = page.locator(".hl-award .trainer-portrait");
   const before = await portrait.boundingBox();
   await portrait.locator("img").evaluate((img) => {

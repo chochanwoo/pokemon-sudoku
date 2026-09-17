@@ -1,113 +1,86 @@
 {
   "S": [
-    { "id": "red", "ko": "레드", "en": "Red", "sprite": "red", "game": "HGSS" }
+    {
+      "id": "selene",
+      "ko": "알로라 챔피언",
+      "en": "Alola Champion",
+      "sprite": "selene",
+      "game": "SM",
+      "artist": "Beliot419"
+    }
   ],
   "A": [
     {
-      "id": "cynthia",
-      "ko": "난천",
-      "en": "Cynthia",
-      "sprite": "cynthia-gen4",
-      "game": "DPPt"
-    },
-    {
-      "id": "lance",
-      "ko": "목호",
-      "en": "Lance",
-      "sprite": "lance",
-      "game": "HGSS"
-    },
-    {
-      "id": "blue",
-      "ko": "그린",
-      "en": "Blue",
-      "sprite": "blue",
-      "game": "HGSS"
+      "id": "hau",
+      "ko": "하우",
+      "en": "Hau",
+      "sprite": "hau",
+      "game": "USUM",
+      "artist": "Beliot419"
     }
   ],
   "B": [
     {
-      "id": "volkner",
-      "ko": "전진",
-      "en": "Volkner",
-      "sprite": "volkner",
-      "game": "DPPt"
+      "id": "acerola",
+      "ko": "사천왕 아세로라",
+      "en": "Elite Four Acerola",
+      "sprite": "acerola",
+      "game": "USUM",
+      "artist": "Beliot419"
     },
     {
-      "id": "gardenia",
-      "ko": "유채",
-      "en": "Gardenia",
-      "sprite": "gardenia",
-      "game": "DPPt"
+      "id": "olivia",
+      "ko": "사천왕 라이치",
+      "en": "Elite Four Olivia",
+      "sprite": "olivia",
+      "game": "USUM",
+      "artist": "Beliot419"
     },
     {
-      "id": "candice",
-      "ko": "무청",
-      "en": "Candice",
-      "sprite": "candice",
-      "game": "DPPt"
+      "id": "kahili",
+      "ko": "사천왕 카일리",
+      "en": "Elite Four Kahili",
+      "sprite": "kahili",
+      "game": "USUM",
+      "artist": "Beliot419"
     },
     {
-      "id": "roark",
-      "ko": "강석",
-      "en": "Roark",
-      "sprite": "roark",
-      "game": "DPPt"
+      "id": "molayne",
+      "ko": "사천왕 멀레인",
+      "en": "Elite Four Molayne",
+      "sprite": "molayne",
+      "game": "USUM",
+      "artist": "Beliot419"
     }
   ],
   "C": [
     {
-      "id": "felix",
-      "ko": "버틀러",
-      "en": "Felix",
-      "sprite": "acetrainer-gen4dp",
-      "game": "DPPt"
-    },
-    {
-      "id": "dana",
-      "ko": "다이안",
-      "en": "Dana",
-      "sprite": "acetrainerf-gen4dp",
-      "game": "DPPt"
-    },
-    {
-      "id": "sandra",
-      "ko": "현세",
-      "en": "Sandra",
-      "sprite": "acetrainerf-gen4dp",
-      "game": "DPPt"
+      "id": "ace-trainer",
+      "ko": "엘리트 트레이너",
+      "en": "Ace Trainer",
+      "sprite": "acetrainer-gen7",
+      "game": "SM",
+      "artist": "kyledove"
     }
   ],
   "D": [
     {
-      "id": "cheryl",
-      "ko": "모미",
-      "en": "Cheryl",
-      "sprite": "cheryl",
-      "game": "DPPt"
-    },
-    {
-      "id": "mira",
-      "ko": "미루",
-      "en": "Mira",
-      "sprite": "mira",
-      "game": "DPPt"
-    },
-    {
-      "id": "marley",
-      "ko": "미정",
-      "en": "Marley",
-      "sprite": "marley",
-      "game": "DPPt"
+      "id": "lillie",
+      "ko": "릴리에",
+      "en": "Lillie",
+      "sprite": "lillie",
+      "game": "SM",
+      "artist": "Beliot419"
     }
   ],
   "E": [
     {
-      "id": "joey",
-      "ko": "오성",
-      "en": "Joey",
-      "sprite": "youngster-gen4",
-      "game": "HGSS"
+      "id": "tourist",
+      "ko": "알로라 관광객",
+      "en": "Alola Tourist",
+      "sprite": "tourist",
+      "game": "SM",
+      "artist": "kyledove"
     }
   ]
 }

@@ -336,17 +336,17 @@ test("daily schedule covers the complete answer pool and practice is determinist
 test("ranks follow attempts used with inclusive boundaries and reject invalid counts", () => {
   assert.deepEqual(
     GUESS_RANKS.map((tier) => tier.label),
-    ["레드급", "난천급", "전진급", "버틀러급", "모미급", "오성급"],
+    ["알로라 챔피언", "하우", "사천왕 아세로라", "엘리트 트레이너", "릴리에", "알로라 관광객"],
   );
   assert.deepEqual(
     GUESS_RANKS.map((tier) => english[tier.label]),
     [
-      "Red tier",
-      "Cynthia tier",
-      "Volkner tier",
-      "Felix tier",
-      "Cheryl tier",
-      "Joey tier",
+      "Alola Champion",
+      "Hau",
+      "Elite Four Acerola",
+      "Ace Trainer",
+      "Lillie",
+      "Alola Tourist",
     ],
   );
   for (const [count, rank] of [

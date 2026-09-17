@@ -1,10 +1,10 @@
 export const GUESS_RANKS = [
-  { rank: "S", max: 5, label: "레드급", sprite: "red" },
-  { rank: "A", max: 10, label: "난천급", sprite: "cynthia-gen4" },
-  { rank: "B", max: 20, label: "전진급", sprite: "volkner" },
-  { rank: "C", max: 30, label: "버틀러급", sprite: "acetrainer-gen4dp" },
-  { rank: "D", max: 40, label: "모미급", sprite: "cheryl" },
-  { rank: "E", max: Infinity, label: "오성급", sprite: "youngster-gen4" },
+  { rank: "S", max: 5, label: "알로라 챔피언", sprite: "selene" },
+  { rank: "A", max: 10, label: "하우", sprite: "hau" },
+  { rank: "B", max: 20, label: "사천왕 아세로라", sprite: "acerola" },
+  { rank: "C", max: 30, label: "엘리트 트레이너", sprite: "acetrainer-gen7" },
+  { rank: "D", max: 40, label: "릴리에", sprite: "lillie" },
+  { rank: "E", max: Infinity, label: "알로라 관광객", sprite: "tourist" },
 ];
 
 export const CLUE_GUESS_RANKS = GUESS_RANKS.map((tier, index) => ({

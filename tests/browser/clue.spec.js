@@ -147,8 +147,8 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   );
   await guess(page, "ivysaur");
   await expect(page.locator("#cq-answer-title")).toHaveText("Ivysaur");
-  await expect(page.locator("#cq-grade")).toHaveText("Red tier");
-  await expect(page.locator(".cq-result-rank .cq-rank")).toHaveText("Red tier");
+  await expect(page.locator("#cq-grade")).toHaveText("Alola Champion");
+  await expect(page.locator(".cq-result-rank .cq-rank")).toHaveText("Alola Champion");
   await expect(page.locator("#cq-input")).toBeHidden();
   await expect(page.locator("#cq-answer .cq-answer-facts > div")).toHaveCount(
     6,
@@ -166,7 +166,7 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   await page.locator('[data-action="share"]').click();
   const text = await page.evaluate(() => window.clueShare);
   expect(text).toContain("PokeClue");
-  expect(text).toContain("Red tier · Solved in 2 guesses");
+  expect(text).toContain("Alola Champion · Solved in 2 guesses");
   expect(text).not.toContain("/8");
   expect(text).toContain("O O O O O O");
   expect(text).not.toContain("Ivysaur");
@@ -178,7 +178,7 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator("#cq-dialog-body")).toContainText("Solved in 2");
   await expect(page.locator(".cq-record-result .cq-rank")).toHaveText(
-    "Red tier",
+    "Alola Champion",
   );
   await page.setViewportSize({ width: 320, height: 844 });
   expect(
@@ -199,7 +199,7 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
 test("eight failed guesses stay playable and a later win receives its earned rank", async ({
   page,
 }) => {
-  const title = `${earnedTrainer("C", dateFor(p("mew").id), 11).ko}급`;
+  const title = `${earnedTrainer("C", dateFor(p("mew").id), 11).ko}`;
   await page.goto(pathFor("mew"));
   for (const key of [
     "bulbasaur",
@@ -267,12 +267,12 @@ test("legacy automatic losses resume without stale loss records or changes to ex
     ),
   ).toEqual([other]);
   await guess(page, "mew");
-  const title = `${earnedTrainer("C", settings.day, 9).ko}급`;
+  const title = `${earnedTrainer("C", settings.day, 9).ko}`;
   await expect(page.locator("#cq-grade")).toHaveText(title);
   await page.locator('[data-action="stats"]').click();
   await expect(page.locator(".cq-record-result .cq-rank")).toHaveText([
     title,
-    "레드급",
+    "알로라 챔피언",
   ]);
   await page.evaluate(
     ({ key, round, loss, other }) => {
@@ -294,7 +294,7 @@ test("legacy automatic losses resume without stale loss records or changes to ex
   ).toEqual([loss, other]);
 });
 
-test("long practice rounds persist, receive Joey rank, and render all six named tiers in both languages on mobile and desktop", async ({
+test("long practice rounds persist, receive Tourist rank, and render all six named tiers in both languages on mobile and desktop", async ({
   page,
 }) => {
   const settings = { mode: "practice", seed: "rank-check" };
@@ -313,9 +313,9 @@ test("long practice rounds persist, receive Joey rank, and render all six named 
   await expect(page.locator("#cq-input")).toBeVisible();
   await guess(page, game.byId.get(round.target).key);
   await expect(page.locator("#cq-used")).toHaveText("41");
-  await expect(page.locator("#cq-grade")).toHaveText("오성급");
+  await expect(page.locator("#cq-grade")).toHaveText("알로라 관광객");
   await page.reload();
-  await expect(page.locator("#cq-grade")).toHaveText("오성급");
+  await expect(page.locator("#cq-grade")).toHaveText("알로라 관광객");
   expect(
     await page.evaluate(() => localStorage.getItem("pokeclue:records")),
   ).toBeNull();
@@ -348,7 +348,7 @@ test("long practice rounds persist, receive Joey rank, and render all six named 
   }
 });
 
-test("all six Gen IV characters replace old titles in saved results, records and bilingual shares", async ({
+test("all six Alola ranks replace old titles in saved results, records and bilingual shares", async ({
   page,
 }) => {
   const settings = { mode: "daily", day: dateFor(p("mew").id) };
@@ -367,8 +367,8 @@ test("all six Gen IV characters replace old titles in saved results, records and
     [16, "E"],
   ]) {
     const trainer = earnedTrainer(rank, settings.day, attempts);
-    const ko = `${trainer.ko}급`,
-      en = `${trainer.en} tier`;
+    const ko = `${trainer.ko}`,
+      en = `${trainer.en}`;
     await page.evaluate(
       ({ key, round, attempts, wrong, day }) => {
         localStorage.setItem(
@@ -688,13 +688,13 @@ test("legacy equivalent-form wins retain their rank but cannot win new rounds wi
     { key: storageKey(game, settings), round: oldRound, day: settings.day },
   );
   await page.reload();
-  await expect(page.locator("#cq-grade")).toHaveText("레드급");
+  await expect(page.locator("#cq-grade")).toHaveText("알로라 챔피언");
   await expect(page.locator("#cq-answer .cq-warning")).toContainText(
     "이전 세대 기준",
   );
   await expect(page.locator("#cq-input")).toBeHidden();
   await page.reload();
-  await expect(page.locator("#cq-grade")).toHaveText("레드급");
+  await expect(page.locator("#cq-grade")).toHaveText("알로라 챔피언");
   await chooseLanguage(page, "en");
   await expect(page.locator("#cq-answer .cq-warning")).toContainText(
     "Your win is preserved",
