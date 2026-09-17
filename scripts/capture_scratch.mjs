@@ -1,5 +1,6 @@
+import { chooseLanguage } from "./browser-language.mjs";
 import { chromium } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import {
   createScratch,
   newRound,
@@ -31,6 +32,7 @@ try {
     viewport: { width: 1440, height: 1000 },
   });
   const errors = [];
+  const previews = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(
     ({ key, value }) => localStorage.setItem(key, value),
@@ -43,7 +45,7 @@ try {
     () => !document.querySelector("#sc-input").disabled,
   );
   for (const language of ["ko", "en"]) {
-    await page.locator("[data-language-select]").selectOption(language);
+    await chooseLanguage(page, language);
     await page.waitForFunction(
       () => !document.querySelector("#sc-input").disabled,
     );
@@ -52,11 +54,10 @@ try {
       path: `.preview/scratch-desktop-${language}.png`,
       fullPage: true,
     });
-    await page
-      .locator(".sc-play")
-      .screenshot({
-        path: `web/src/assets/scratch-preview${language === "en" ? "-en" : ""}.png`,
-      });
+    previews.push([
+      `web/src/assets/scratch-preview${language === "en" ? "-en" : ""}.png`,
+      await page.locator(".sc-play").screenshot(),
+    ]);
     for (const [width, height] of [
       [390, 844],
       [320, 568],
@@ -76,6 +77,8 @@ try {
     }),
   );
   if (errors.length) throw new Error(errors.join("\n"));
+  // Avoid Vite reloading the active page while responsive captures are running.
+  for (const [path, preview] of previews) writeFileSync(path, preview);
 } finally {
   await browser.close();
 }

@@ -1,6 +1,6 @@
 import {
   createIcons,
-  Gamepad2,
+  TreePalm,
   Languages,
   CircleHelp,
   ChartNoAxesColumn,
@@ -45,7 +45,6 @@ import {
   rankName,
   trainerBadge,
   trainerReplay,
-  trainerGuide,
   trainerResult,
   onTrainerImageError,
 } from "./trainer-results.js";
@@ -54,7 +53,7 @@ import "./style.css";
 import "./pokeclue.css";
 
 const icons = {
-  Gamepad2,
+  TreePalm,
   Languages,
   CircleHelp,
   ChartNoAxesColumn,
@@ -655,13 +654,11 @@ function onClick(event) {
       dialog(
         "포케클루 규칙",
         `<ul class="rules">
-      <li>${t("횟수 제한 없이 추측하고, 정답을 맞히기까지 사용한 횟수로 등급을 받습니다. 타입·특성·알 그룹은 순서와 무관하게 모두 같으면 일치, 일부만 같으면 일부 일치입니다.")}</li>
-      <li>${t("화살표는 정답을 가리킵니다. 위 화살표는 정답의 값이 더 높고, 아래 화살표는 더 낮다는 뜻입니다.")}</li>
-      <li>${t("진화는 단계와 계열을 함께 비교합니다. 계열은 이상해씨·이상해풀·이상해꽃처럼 이어지는 진화 계보입니다. 아기 포켓몬부터 1단계로 세며, 메가진화는 단계를 올리지 않습니다. 세대는 해당 모습이 처음 등장한 게임의 세대입니다. 예를 들어 가디는 1세대, 히스이 가디는 8세대입니다. 단, 메가진화와 거다이맥스는 원본 포켓몬의 세대를 사용합니다.")}</li>
-      <li>${t("특성은 숨겨진 특성을 포함합니다. 미확인 자료는 판정하지 않습니다. 특성 자료가 없거나 다른 종과 모든 단서가 같아 구별할 수 없는 포켓몬은 정답으로 출제하지 않습니다.")}</li>
-      <li>${t("메가·리전 폼도 포함합니다. 같은 종에서 모든 단서가 같은 외형 차이는 같은 정답으로 인정하며, 일부 이벤트·기념용 모습은 제외합니다.")}</li>
-      <li>${t("데일리는 한국 시간 자정에 바뀝니다. 연습은 데일리 기록과 별개이며, 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>
-      ${trainerGuide("cq-rank-guide", GUESS_RANKS)}`,
+      <li>${t("오늘의 포켓몬을 맞혀보세요!")}</li>
+      <li>${t("타입, 특성, 알 그룹, 진화 단계, 최초 출현 세대, 종족값 합계가 힌트로 주어집니다.")}</li>
+      <li>${t("외형이 다른 동일한 포켓몬(플라엣테 빨간 꽃, 노란 꽃 등)은 모두 동일하게 정답으로 간주됩니다.")}</li>
+      <li>${t("연습 모드를 통해 더 많은 퀴즈를 즐겨보세요!")}</li></ul>
+      <p class="dialog-copy">${t("오늘의 포켓몬은 한국 시간 자정에 변경됩니다.")}</p>`,
       );
       break;
     case "stats": {

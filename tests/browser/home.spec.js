@@ -1,4 +1,124 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
+
+test("Alola masthead keeps real sprites and the first game visible in both languages", async ({
+  page,
+}) => {
+  await page.goto("./");
+  const scenery = page.locator(".hub-scenery");
+  await expect(scenery).toBeVisible();
+  const panorama = await scenery.evaluate(async (image) => {
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 96;
+    canvas.height = 32;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, 96, 32);
+    const pixels = context.getImageData(0, 0, 96, 32).data;
+    const colors = new Set();
+    for (let i = 0; i < pixels.length; i += 4)
+      colors.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
+    return {
+      width: image.naturalWidth,
+      colors: colors.size,
+      local: new URL(image.src).origin === location.origin,
+    };
+  });
+  expect(panorama.width).toBeGreaterThan(1500);
+  expect(panorama.colors).toBeGreaterThan(100);
+  expect(panorama.local).toBe(true);
+  for (const language of ["ko", "en"]) {
+    await chooseLanguage(page, language);
+    await expect(page.locator(".hub-heading")).toHaveText(
+      language === "ko" ? "전체 게임" : "All games",
+    );
+    await expect(page.locator(".site-header")).not.toContainText(
+      /비공식 팬 게임|Unofficial fan game/,
+    );
+    await expect(page.locator(".game-formats")).toHaveCount(0);
+    await expect(page.locator(".game-card-content")).toHaveCount(6);
+    await expect(page.locator(".game-card-content p")).toHaveCount(0);
+    await expect(page.locator(".hub-footer")).toContainText(
+      language === "ko" ? "비공식 팬 게임" : "Unofficial fan game",
+    );
+    await expect(page.locator(".hub-intro h1")).toHaveText("Alola.");
+    await expect(page.locator(".brand-caption")).toHaveText(
+      language === "ko" ? "포켓몬 퀴즈" : "Pokemon Quiz",
+    );
+    const sprites = await page
+      .locator(".hub-residents img")
+      .evaluateAll(async (images) => {
+        return Promise.all(
+          images.map(async (image) => {
+            await image.decode();
+            const canvas = document.createElement("canvas");
+            canvas.width = canvas.height = 96;
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0, 96, 96);
+            const pixels = context.getImageData(0, 0, 96, 96).data;
+            let visible = 0;
+            for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
+            return {
+              alt: image.alt,
+              visible,
+              local:
+                image.src.startsWith("data:image/png;base64,") ||
+                new URL(image.src).origin === location.origin,
+            };
+          }),
+        );
+      });
+    expect(sprites).toHaveLength(2);
+    for (const sprite of sprites) {
+      expect(sprite.alt).toBeTruthy();
+      expect(sprite.local).toBe(true);
+      expect(sprite.visible).toBeGreaterThan(100);
+    }
+    for (const [width, height] of [
+      [320, 568],
+      [390, 844],
+      [800, 900],
+      [1920, 1080],
+    ]) {
+      await page.setViewportSize({ width, height });
+      const layout = await page.evaluate(() => {
+        const heading = document
+          .querySelector(".hub-intro h1")
+          .getBoundingClientRect();
+        const residents = document
+          .querySelector(".hub-residents")
+          .getBoundingClientRect();
+        const firstGame = document
+          .querySelector(".game-card h2")
+          .getBoundingClientRect();
+        return {
+          overlap: heading.right > residents.left,
+          firstGameVisible: firstGame.bottom < innerHeight,
+          overflow: document.documentElement.scrollWidth > innerWidth,
+          fullWidth:
+            document.querySelector(".hub-intro").getBoundingClientRect()
+              .width === innerWidth,
+        };
+      });
+      expect(layout).toEqual({
+        overlap: false,
+        firstGameVisible: true,
+        overflow: false,
+        fullWidth: true,
+      });
+    }
+    const game = page.locator(".game-card").first();
+    const before = await game.boundingBox();
+    await game.hover();
+    expect(await game.boundingBox()).toEqual(before);
+    await game.focus();
+    expect(await game.boundingBox()).toEqual(before);
+    await page.screenshot({
+      path: `.preview/alola-wide-${language}.png`,
+      fullPage: true,
+    });
+  }
+});
 
 test("every page shares the same home brand and game logos return to the library", async ({
   page,
@@ -31,8 +151,9 @@ test("every page shares the same home brand and game logos return to the library
     await expect(brand).toBeVisible();
     await expect(page).toHaveTitle(title);
     await expect(brand).toHaveAttribute("href", "./");
-    await expect(brand.locator("svg.lucide-gamepad-2")).toHaveCount(1);
-    await expect(brand.locator(".brand-caption")).toHaveText("POKÉMON QUIZ");
+    await expect(brand.locator("svg.lucide-tree-palm")).toHaveCount(1);
+    await expect(brand.locator(".brand-wordmark")).toContainText("alola");
+    await expect(brand.locator(".brand-caption")).toHaveText("포켓몬 퀴즈");
     reference ??= await brand.innerHTML();
     expect(await brand.innerHTML()).toBe(reference);
     if (name !== "home") {
@@ -57,14 +178,13 @@ test("every page shares the same home brand and game logos return to the library
             box.top >= header.top &&
             box.bottom <= header.bottom &&
             el.scrollWidth <= el.clientWidth,
-          color: getComputedStyle(el.querySelector(".brand-mark"))
-            .backgroundColor,
+          color: getComputedStyle(el.querySelector(".brand-mark")).color,
           icon: el.querySelector("svg").getBoundingClientRect().width,
           overflow: document.documentElement.scrollWidth > innerWidth,
         };
       });
       expect(layout.fits).toBe(true);
-      expect(layout.color).toBe("rgb(223, 71, 72)");
+      expect(layout.color).toBe("rgb(22, 119, 107)");
       expect(layout.icon).toBeGreaterThan(20);
       expect(layout.overflow).toBe(false);
       if (width !== 320)
@@ -104,7 +224,7 @@ test("game library is responsive, uses a real local preview and does not start S
     exact: true,
   });
   await expect(pokemantle).toHaveAttribute("href", "./pokemantle.html");
-  await expect(pokemantle.locator(".game-formats")).toHaveText("데일리");
+  await expect(pokemantle.locator(".game-formats")).toHaveCount(0);
   await expect(page.locator(".game-library")).not.toContainText(/1,?579/);
   await expect(page.locator("#board")).toHaveCount(0);
   expect(requests.some((url) => /catalog\.json|puzzles\.json/.test(url))).toBe(

@@ -1,6 +1,6 @@
 import { GUESS_RANKS, rankFor } from "./trainer-ranks.js";
 import { t, getLanguage } from "./i18n.js";
-import { TRAINERS, trainerFor } from "./trainers.js";
+import { trainerFor } from "./trainers.js";
 import "./trainer-results.css";
 
 const images = import.meta.glob("./assets/trainers/*.png", {
@@ -50,25 +50,6 @@ export function trainerTaunt(rank) {
   return rank === "E"
     ? `<p class="trainer-taunt">${esc(t("꼬마야, 더 배우고 와~"))}</p>`
     : "";
-}
-
-export function trainerGuideBadge(rank) {
-  const others = TRAINERS[rank]
-    .slice(1)
-    .map((trainer) => trainer[getLanguage()]);
-  return `${trainerBadge(rank)}${others.length ? `<small class="trainer-pool-names">${esc(others.join(" · "))}</small>` : ""}`;
-}
-
-export function trainerGuide(extraClass = "", ranks = GUESS_RANKS) {
-  return `<section class="trainer-rank-rules"><h3>${t("등급 기준")}</h3><dl class="trainer-rank-guide ${extraClass}">${ranks
-    .map((tier, index) => {
-      const min = index ? ranks[index - 1].max + 1 : 1;
-      const range = Number.isFinite(tier.max)
-        ? t("{min}~{max}회", { min, max: tier.max })
-        : t("{min}회 이상", { min });
-      return `<div><dt>${trainerGuideBadge(tier.rank)}</dt><dd>${range}</dd></div>`;
-    })
-    .join("")}</dl></section>`;
 }
 
 export function trainerResult({

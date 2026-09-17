@@ -1,3 +1,4 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import {
@@ -46,10 +47,10 @@ test("the new hub card has real localized previews and both navigation direction
 }) => {
   await page.goto("./");
   await expect(page.locator(".game-card")).toHaveCount(6);
-  await expect(page.locator(".hub-heading > span")).toHaveText("6개 게임");
+  await expect(page.locator(".hub-heading > span")).toHaveCount(0);
   const card = page.getByRole("link", { name: "포케클루 플레이", exact: true });
   await expect(card).toHaveAttribute("href", "./pokeclue.html");
-  await expect(card.locator(".game-formats")).toHaveText("데일리 · 연습");
+  await expect(card.locator(".game-formats")).toHaveCount(0);
   const koImage = await card.locator("img").getAttribute("src");
   for (const width of [320, 390, 800, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -74,7 +75,7 @@ test("the new hub card has real localized previews and both navigation direction
     expect(fit.colors).toBeGreaterThan(100);
     expect(fit.overflow).toBe(false);
   }
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   const english = page.getByRole("link", {
     name: "PokeClue Play",
     exact: true,
@@ -88,7 +89,7 @@ test("the new hub card has real localized previews and both navigation direction
     .click();
   await page.getByRole("link", { name: "PokeClue Play", exact: true }).click();
   await expect(page.locator("#cq-count")).toHaveText("1");
-  await page.locator("[data-language-select]").selectOption("ko");
+  await chooseLanguage(page, "ko");
   await expect(page.locator('[data-result="1"]')).toContainText("이상해씨");
 });
 
@@ -133,7 +134,7 @@ test("clue comparisons, keyboard input, duplicate protection, language, saving a
   );
   await page.reload();
   await expect(page.locator("#cq-count")).toHaveText("1");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(row).toContainText("Bulbasaur");
   await expect(row.locator('[data-field="evolution"]')).toContainText(
     "Same family",
@@ -319,7 +320,7 @@ test("long practice rounds persist, receive Joey rank, and render all six named 
     await page.evaluate(() => localStorage.getItem("pokeclue:records")),
   ).toBeNull();
   for (const language of ["ko", "en"]) {
-    await page.locator("[data-language-select]").selectOption(language);
+    await chooseLanguage(page, language);
     for (const width of [320, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(
@@ -333,52 +334,12 @@ test("long practice rounds persist, receive Joey rank, and render all six named 
         path: `.preview/pokeclue-rank-${language}-${width}.png`,
       });
       await page.locator('[data-action="help"]').click();
-      await expect(page.locator(".cq-rank-guide dt .trainer-badge")).toHaveText(
-        language === "ko"
-          ? ["레드급", "난천급", "전진급", "버틀러급", "모미급", "오성급"]
-          : [
-              "Red tier",
-              "Cynthia tier",
-              "Volkner tier",
-              "Felix tier",
-              "Cheryl tier",
-              "Joey tier",
-            ],
-      );
-      await expect(page.locator(".cq-rank-guide dd")).toHaveText(
-        language === "ko"
-          ? ["1~3회", "4~5회", "6~8회", "9~11회", "12~15회", "16회 이상"]
-          : [
-              "1-3 guesses",
-              "4-5 guesses",
-              "6-8 guesses",
-              "9-11 guesses",
-              "12-15 guesses",
-              "16+ guesses",
-            ],
-      );
+      await expect(page.locator(".trainer-rank-guide")).toHaveCount(0);
       expect(
         await page
           .locator("#cq-dialog")
           .evaluate((el) => el.scrollWidth <= el.clientWidth),
       ).toBe(true);
-      expect(
-        await page.locator(".cq-rank-guide dd").evaluateAll((els) =>
-          els.every((el) => {
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-            context.font = getComputedStyle(el).font;
-            return el.textContent
-              .split(/\s+/)
-              .every(
-                (word) =>
-                  context.measureText(word).width <=
-                  el.getBoundingClientRect().width,
-              );
-          }),
-        ),
-      ).toBe(true);
-      await page.locator(".cq-rank-guide").scrollIntoViewIfNeeded();
       await page.screenshot({
         path: `.preview/pokeclue-ranks-help-${language}-${width}.png`,
       });
@@ -452,7 +413,7 @@ test("all six Gen IV characters replace old titles in saved results, records and
       ["ko", ko],
       ["en", en],
     ]) {
-      await page.locator("[data-language-select]").selectOption(language);
+      await chooseLanguage(page, language);
       await expect(page.locator("#cq-grade")).toHaveText(title);
       await expect(page.locator(".cq-result-rank .cq-rank")).toHaveText(title);
       await page.locator('[data-action="share"]').click();
@@ -553,7 +514,7 @@ test("mobile and desktop comparisons, answer facts and rules remain readable in 
     ),
   ).toHaveAttribute("data-state", "unknown");
   for (const language of ["ko", "en"]) {
-    await page.locator("[data-language-select]").selectOption(language);
+    await chooseLanguage(page, language);
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       const fit = await page.locator("#cq-history").evaluate(async (el) => {
@@ -591,7 +552,7 @@ test("mobile and desktop comparisons, answer facts and rules remain readable in 
       });
     }
     await page.locator('[data-action="help"]').click();
-    await expect(page.locator("#cq-dialog-body li")).toHaveCount(6);
+    await expect(page.locator("#cq-dialog-body li")).toHaveCount(4);
     await page.setViewportSize({ width: 320, height: 844 });
     const dialog = await page.locator("#cq-dialog").boundingBox();
     expect(dialog.x).toBeGreaterThanOrEqual(0);
@@ -676,7 +637,7 @@ test("form generation clues and arrows are corrected in existing rounds, both la
   }
   await page.reload();
   await expect(page.locator("#cq-count")).toHaveText("6");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(original).toContainText("Gen 1");
   await guess(page, "growlithe-hisui");
   await expect(page.locator("#cq-answer-title")).toHaveText(
@@ -734,7 +695,7 @@ test("legacy equivalent-form wins retain their rank but cannot win new rounds wi
   await expect(page.locator("#cq-input")).toBeHidden();
   await page.reload();
   await expect(page.locator("#cq-grade")).toHaveText("레드급");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(page.locator("#cq-answer .cq-warning")).toContainText(
     "Your win is preserved",
   );
@@ -762,14 +723,12 @@ test("Mega and Gmax use species generation in clues, answers and bilingual rules
   await guess(page, "charizard-mega-x");
   await expect(page.locator(".cq-answer-facts")).toContainText("1세대");
   await page.locator('[data-action="help"]').click();
-  await expect(page.locator("#cq-dialog-body")).toContainText(
-    "메가진화와 거다이맥스는 원본 포켓몬의 세대를 사용합니다.",
-  );
+  await expect(page.locator("#cq-dialog-body")).toContainText("최초 출현 세대");
   await page.locator('#cq-dialog [data-action="close-dialog"]').click();
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await page.locator('[data-action="help"]').click();
   await expect(page.locator("#cq-dialog-body")).toContainText(
-    "Mega Evolutions and Gigantamax forms use the original Pokemon's generation instead.",
+    "debut generation",
   );
   await page.locator('#cq-dialog [data-action="close-dialog"]').click();
   await page.goto(pathFor("charizard"));
@@ -848,7 +807,7 @@ test("bad bundles, corrupt saves and blocked storage fail safely without touchin
   await guess(page, "bulbasaur");
   await expect(page.locator("#cq-count")).toHaveText("1");
   await expect(page.locator("#cq-save-warning")).toBeVisible();
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(page.locator("#cq-count")).toHaveText("1");
   expect(
     await page.evaluate(() => [

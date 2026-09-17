@@ -1,5 +1,6 @@
 import english from "./locales/en.js";
 import { englishName } from "./pokemon-names.js";
+import { initLanguageMenu } from "./language-menu.js";
 
 export const LANGUAGE_KEY = "pokemon-quiz:language";
 const listeners = new Set();
@@ -46,11 +47,7 @@ export function initLanguage(title, render) {
     update();
     render();
   });
-  document.addEventListener("change", (event) => {
-    if (!event.target.matches("[data-language-select]")) return;
-    if (setLanguage(event.target.value))
-      document.querySelector("[data-language-select]")?.focus();
-  });
+  initLanguageMenu(setLanguage);
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) setLanguage(storedLanguage());
   });

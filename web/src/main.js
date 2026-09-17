@@ -23,7 +23,7 @@ import {
   CalendarDays,
   ChevronDown,
   ListChecks,
-  Gamepad2,
+  TreePalm,
   Eye,
   Languages,
 } from "lucide";
@@ -83,7 +83,7 @@ const icons = {
   CalendarDays,
   ChevronDown,
   ListChecks,
-  Gamepad2,
+  TreePalm,
   Eye,
   Languages,
 };
@@ -1067,9 +1067,8 @@ function showHelp() {
   showDialog(
     "타입도쿠 규칙",
     `<div class="rule-example">${sprite(byId.get(1))}<div><strong>${esc(pokemonName(byId.get(1)))}</strong><div>${[12, 4].map(badge).join("")}</div></div></div>
-    <ol class="rules"><li>${tr("빈 칸마다 <strong>두 타입을 가진 포켓몬</strong>을 놓습니다.")}</li><li>${tr("같은 가로줄, 세로줄, 굵은 선으로 나눈 구역 안에서는 <strong>어떤 타입도 두 번 나올 수 없습니다.</strong>")}</li><li>${tr("<strong>같은 포켓몬은 보드 전체에서 한 번만</strong> 사용할 수 있습니다. 주어진 포켓몬도 포함합니다.")}</li><li>${tr("각 줄과 구역에 이번 퍼즐의 {count}개 타입이 한 번씩 들어가면 완성입니다.", { count: puzzle.types.length })}</li><li>${tr("주어진 포켓몬은 바꿀 수 없습니다. 같은 타입 조합이라도 서로 다른 포켓몬이면 사용할 수 있습니다.")}</li></ol>
-    <p class="dialog-copy">${tr("오늘의 퍼즐은 한국 시간 자정에 바뀝니다. 크기와 난이도가 같으면 모두 같은 문제를 받습니다.")}</p>
-    <p class="dialog-copy">${packVersion === 2 ? tr("포켓몬 기본 폼 526종을 사용합니다. 지역 폼과 메가진화는 포함하지 않습니다.") : tr("기본 폼과 메가진화·지역 폼 중 두 타입을 가진 {count}개 모습을 사용합니다. 서로 다른 모습은 별개의 포켓몬으로 취급합니다.", { count: catalog.pokemon.length })}</p>`,
+    <ol class="rules"><li>${tr("포켓몬 타입 스도쿠를 완성해보세요!")}</li><li>${tr("같은 가로줄, 세로줄, 굵은 선으로 나눈 구역 안에서는 <strong>어떤 타입도 두 번 나올 수 없습니다.</strong>")}</li><li>${tr("<strong>같은 포켓몬은 보드 전체에서 한 번만</strong> 사용할 수 있습니다. 주어진 포켓몬도 포함합니다.")}</li><li>${tr("주어진 포켓몬은 바꿀 수 없습니다.")}</li><li>${tr("같은 타입 조합이라도 서로 다른 포켓몬이면 사용할 수 있습니다.")}</li></ol>
+    <p class="dialog-copy">${tr("오늘의 퍼즐은 한국 시간 자정에 바뀝니다.")}</p>`,
   );
 }
 

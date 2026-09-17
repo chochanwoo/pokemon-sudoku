@@ -501,17 +501,17 @@ test("new weights rescore existing guesses without changing today's answer, and 
     page.getByRole("heading", { name: "포맨틀 규칙" }),
   ).toBeVisible();
   const help = page.locator("#pm-dialog-body");
-  await expect(help.getByRole("listitem")).toHaveCount(5);
+  await expect(help.getByRole("listitem")).toHaveCount(4);
   for (const rule of [
-    "외형만 다른 모습은 하나로 합칩니다",
-    "100점, 1위",
+    "오늘의 포켓몬을 맞혀보세요!",
+    "유사도가 높을수록 정답과 가깝습니다",
+    "도감 설명",
+    "모티브 요소",
     "최대 3번",
     "한국 시간 자정",
   ])
     await expect(help).toContainText(rule);
-  await expect(help).not.toContainText(
-    /%|가중치|종족값|도감 설명|모티브|습득 기술|알그룹|체격/,
-  );
+  await expect(help).not.toContainText(/%|가중치|등급 기준/);
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
     const box = await page.locator("#pm-dialog").boundingBox();

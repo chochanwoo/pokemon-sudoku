@@ -1,6 +1,6 @@
 import {
   createIcons,
-  Gamepad2,
+  TreePalm,
   Languages,
   CircleHelp,
   ChartNoAxesColumn,
@@ -21,7 +21,6 @@ import {
   createScratch,
   SIZE,
   COUNT,
-  RANKS,
   dayKey,
   settingsFromSearch,
   challengeKey,
@@ -46,7 +45,6 @@ import { t, getLanguage, initLanguage } from "./i18n.js";
 import { trainerResultKey } from "./trainers.js";
 import {
   trainerBadge,
-  trainerGuideBadge,
   trainerTaunt,
   rankName,
   onTrainerImageError,
@@ -55,7 +53,7 @@ import "./style.css";
 import "./scratch.css";
 
 const icons = {
-  Gamepad2,
+  TreePalm,
   Languages,
   CircleHelp,
   ChartNoAxesColumn,
@@ -408,8 +406,26 @@ function bindCanvas(on) {
   on(canvas, "blur", () => {
     pointer.hidden = true;
   });
-  on(canvas, "keydown", (e) => {
-    if (!ready || item.outcome) return;
+  on(document, "keydown", (e) => {
+    if (
+      !ready ||
+      item.outcome ||
+      e.defaultPrevented ||
+      e.ctrlKey ||
+      e.altKey ||
+      e.metaKey
+    )
+      return;
+    const focused = document.activeElement === canvas;
+    const hovering =
+      canvas.matches(":hover") && document.activeElement === document.body;
+    if (!focused && !(hovering && [" ", "Enter"].includes(e.key))) return;
+    if (
+      document.querySelector(
+        'dialog[open], [data-language-trigger][aria-expanded="true"]',
+      )
+    )
+      return;
     const directions = {
       ArrowLeft: [-8, 0],
       ArrowRight: [8, 0],
@@ -594,7 +610,7 @@ function dialog(kind) {
     body = `<div class="sc-dialog-actions"><button class="text-button" data-action="close-dialog">${t("취소")}</button><button class="primary-button" data-action="start-practice">${icon("rotate-cw")}${t("새 연습 시작")}</button></div>`;
   } else if (kind === "help") {
     title = "포케 스크래치 규칙";
-    body = `<ul class="rules"><li>${t("가림막을 직접 지우며 포켓몬을 맞혀 보세요. 마우스나 손가락으로 문지르거나, 보드에 초점을 둔 뒤 방향키로 이동하고 Space 또는 Enter로 지울 수 있어요.")}</li><li>${t("100점에서 시작하며, 초반에는 크게, 이후에는 완만하게 감점돼요. 오답당 5점을 추가로 뺍니다. 맞히면 최소 10점, 정답 공개는 0점이며 시간 감점은 없어요.")}</li><li>${t("빈 여백을 잘라낸 그림 영역만 계산하며, 같은 곳을 다시 지워도 추가 감점은 없어요. 지운 부분은 새로고침해도 유지돼요.")}</li><li>${t("한 세트는 5문제, 총 500점입니다. 기본 모습·리전폼·메가진화가 등장하며, 같은 그림을 쓰는 모습은 같은 정답으로 인정해요.")}</li><li>${t("데일리는 한국 시간 자정에 바뀌며, 연습과 진행 기록을 따로 저장해요.")}</li></ul><section class="trainer-rank-rules"><h3>${t("등급 기준")}</h3><dl class="trainer-rank-guide">${RANKS.map((tier, i) => `<div><dt>${trainerGuideBadge(tier.rank)}</dt><dd>${t("{min}~{max}점", { min: tier.min, max: i ? RANKS[i - 1].min - 1 : 500 })}</dd></div>`).join("")}</dl></section>`;
+    body = `<ul class="rules"><li>${t("가림막 뒤에는 어떤 포켓몬이 숨어있을까요? 마우스나 손가락으로 문지르거나, 커서를 올린 뒤 Space 또는 Enter로 지울 수 있어요.")}</li><li>${t("퀴즈 한 세트는 총 5개의 문제로 구성되며, 각 문제마다 100점의 점수가 배정됩니다.")}</li><li>${t("가림막을 긁어낼수록 점수가 더 낮아집니다!")}</li><li>${t("연습 모드를 통해 더 많은 퀴즈를 즐겨보세요!")}</li></ul><p class="dialog-copy">${t("데일리 문제는 한국 시간 자정에 변경됩니다.")}</p>`;
   } else if (kind === "result") {
     title = "도전 결과";
     const score = totalScore(round),

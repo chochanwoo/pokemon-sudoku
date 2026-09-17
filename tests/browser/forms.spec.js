@@ -1,3 +1,4 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import {
@@ -36,11 +37,11 @@ test("Arceus has only 18 real types in search and revealed rankings in both lang
     path: ".preview/arceus-search-390.png",
     fullPage: true,
   });
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await page.locator("#guess-input").fill("Arceus");
   await expect(page.locator("#match-count")).toHaveText("18 forms");
   await expect(page.locator("#guess-options [role=option]")).toHaveCount(18);
-  await page.locator("[data-language-select]").selectOption("ko");
+  await chooseLanguage(page, "ko");
   await page.locator("#guess-input").fill("아르세우스");
   await page.locator('#guess-options [data-guess="493"]').click();
   await expect(page.locator("#attempts")).toHaveText("1");
@@ -52,7 +53,7 @@ test("Arceus has only 18 real types in search and revealed rankings in both lang
   await expect(
     page.locator("#similarity-ranking .pm-type-unknown"),
   ).toHaveCount(0);
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await page.locator("#ranking-search").fill("Arceus");
   await expect(page.locator("#similarity-ranking tr")).toHaveCount(18);
   await expect(
@@ -113,7 +114,7 @@ test("special forms stay hidden while base mythicals and ambiguous forms remain 
   await page.goto("./pokemantle.html?date=2026-09-10");
   const input = page.locator("#guess-input");
   for (const language of ["ko", "en"]) {
-    await page.locator("[data-language-select]").selectOption(language);
+    await chooseLanguage(page, language);
     for (const query of [
       "너로정했다캡",
       "pikachu partner cap",
@@ -298,7 +299,7 @@ for (const width of [390, 1440])
       "aria-label",
       new RegExp(region.baseName),
     );
-    await page.locator("[data-language-select]").selectOption("en");
+    await chooseLanguage(page, "en");
     await page.locator(`[data-cell="${index}"]`).click();
     await page.locator("#search").fill("Mega Charizard X");
     await expect(page.locator('[data-pokemon="10134"]')).toBeVisible();

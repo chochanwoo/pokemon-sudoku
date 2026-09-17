@@ -1,5 +1,46 @@
 // Korean source messages are the default locale and the translation keys.
 export default {
+  "포켓몬 타입 스도쿠를 완성해보세요!": "Complete the Pokemon type sudoku!",
+  "주어진 포켓몬은 바꿀 수 없습니다.": "The given Pokemon stay where they are.",
+  "같은 타입 조합이라도 서로 다른 포켓몬이면 사용할 수 있습니다.":
+    "Different Pokemon with the same type combination are welcome.",
+  "오늘의 퍼즐은 한국 시간 자정에 바뀝니다.":
+    "A new daily puzzle arrives at midnight in Korea (UTC+9).",
+  "오늘의 포켓몬을 맞혀보세요!": "Can you guess today's Pokemon?",
+  "오늘의 포켓몬에 대한 힌트가 유사도로 주어집니다! 유사도가 높을수록 정답과 가깝습니다.":
+    "Let similarity guide you to today's Pokemon! The higher the score, the closer you are to the answer.",
+  "유사도에는 타입, 특성, 알 그룹, 도감 설명, 배우는 기술, 모티브 요소 등 거의 모든 것이 포함됩니다!":
+    "Similarity takes almost everything into account: types, Abilities, Egg Groups, Pokedex entries, learnable moves, design inspirations and more!",
+  "연습 모드를 통해 더 많은 퀴즈를 즐겨보세요!":
+    "Keep the fun going with more quizzes in Practice mode!",
+  "오늘의 포켓몬은 한국 시간 자정에 변경됩니다.":
+    "A new Pokemon awaits at midnight in Korea (UTC+9).",
+  "타입, 특성, 알 그룹, 진화 단계, 최초 출현 세대, 종족값 합계가 힌트로 주어집니다.":
+    "Your clues are types, Abilities, Egg Groups, evolution stage, debut generation and base stat total.",
+  "외형이 다른 동일한 포켓몬(플라엣테 빨간 꽃, 노란 꽃 등)은 모두 동일하게 정답으로 간주됩니다.":
+    "Cosmetic variations of the same Pokemon, like Red Flower and Yellow Flower Floette, all count as the same answer.",
+  "어느 포켓몬의 종족값이 더 높을까요?":
+    "Which Pokemon has the higher base stat total?",
+  "틀릴 때까지 도전이 계속됩니다.": "Keep going until your first wrong answer!",
+  "데일리 문제의 출제 순서는 한국 시간 자정에 변경됩니다.":
+    "The daily showdown order changes at midnight in Korea (UTC+9).",
+  "똑똑한 윤겔라가 당신이 생각한 포켓몬을 맞힐 수 있을까요?":
+    "Can clever Kadabra guess the Pokemon on your mind?",
+  "질문은 최대 25개, 추측은 최대 3회입니다.":
+    "Kadabra gets up to 25 questions and 3 guesses.",
+  "뒤로가기를 통해 이전 질문의 답변을 바꿀 수 있습니다. 답변을 바꾸면 그 이후의 문답부터 다시 추리합니다.":
+    "Changed your mind? Go back to change an earlier answer, and Kadabra will rethink everything from that point.",
+  "가림막 뒤에는 어떤 포켓몬이 숨어있을까요? 마우스나 손가락으로 문지르거나, 커서를 올린 뒤 Space 또는 Enter로 지울 수 있어요.":
+    "Who's hiding behind the cover? Rub it away with your mouse or finger, or place your cursor over it and press Space or Enter.",
+  "퀴즈 한 세트는 총 5개의 문제로 구성되며, 각 문제마다 100점의 점수가 배정됩니다.":
+    "Each set has 5 pictures, with 100 points up for grabs in each one.",
+  "가림막을 긁어낼수록 점수가 더 낮아집니다!":
+    "The more you scratch away, the fewer points you earn!",
+  "데일리 문제는 한국 시간 자정에 변경됩니다.":
+    "New daily pictures arrive at midnight in Korea (UTC+9).",
+  "잠깐 쉬어가도 괜찮아.": "A little island time.",
+  "라이츄 (알로라)": "Alolan Raichu",
+  나몰빼미: "Rowlet",
   "포케 스크래치": "Poke Scratch",
   "포케 스크래치 | 포켓몬 퀴즈": "Poke Scratch | Pokemon Quiz",
   "포케 스크래치 규칙": "Poke Scratch rules",
@@ -410,14 +451,6 @@ export default {
   "데일리 기록": "Daily records",
   "오늘의 단서를 준비하고 있어요": "Loading today's clues",
   "포케 하이로우": "Poke High Low",
-  일반: "Normal",
-  하드: "Hard",
-  "일반은 종족값 합계, 하드는 매 대결에 지정된 개별 능력치를 비교합니다. 더 높은 포켓몬을 선택하면 양쪽 수치를 공개합니다.":
-    "Normal compares base stat totals. Hard compares the individual stat named in each showdown. Pick the Pokemon with the higher value to reveal both numbers.",
-  "하드는 HP·공격·방어·특수공격·특수방어·스피드가 번갈아 출제됩니다. 레벨, 성격, 노력치 등은 반영하지 않으며 메가·리전 폼은 해당 모습의 종족값을 사용합니다.":
-    "Hard cycles through HP, Attack, Defense, Sp. Atk, Sp. Def and Speed. Level, nature and EVs do not apply. Mega and regional forms use their own base stats.",
-  "난이도마다 데일리·연습·최고 기록을 따로 저장합니다. 같은 난이도의 데일리는 모두에게 같은 순서로 출제되며 한국 시간 자정에 바뀝니다. 기존 개별 능력치 기록은 하드에서 이어집니다.":
-    "Each difficulty saves daily progress, practice and personal bests separately. Everyone gets the same daily sequence for that difficulty, changing at midnight in Korea (UTC+9). Previous individual-stat records continue in Hard.",
   "포케 하이로우 | 포켓몬 퀴즈": "Poke High Low | Pokemon Quiz",
   "종족값 대결": "Base stat showdown",
   "두 포켓몬의 종족값을 비교하는 포케 하이로우 대결":

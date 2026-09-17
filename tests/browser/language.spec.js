@@ -1,13 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { englishName } from "../../web/src/pokemon-names.js";
+import { chooseLanguage as language } from "../../scripts/browser-language.mjs";
 
 const catalog = JSON.parse(
   readFileSync(new URL("../../web/public/catalog.json", import.meta.url)),
 );
 
-const language = (page, value) =>
-  page.locator("[data-language-select]").selectOption(value);
 const sudoku = "./sudoku.html?size=4&level=easy&seed=free:language";
 const mantle = "./pokemantle.html?date=2026-09-10";
 
@@ -21,7 +20,9 @@ async function noKoreanUI(page) {
     while (walker.nextNode()) {
       const node = walker.currentNode;
       if (
-        !node.parentElement.closest("select,script,style,noscript") &&
+        !node.parentElement.closest(
+          "select,script,style,noscript,[data-language-option]",
+        ) &&
         /[가-힣]/.test(node.textContent)
       )
         found.push(node.textContent);
@@ -60,7 +61,7 @@ test("language persists across the library, both games and reloads", async ({
   await expect(page.getByRole("heading", { name: "All games" })).toBeVisible();
   await noKoreanUI(page);
   await page.reload();
-  await expect(page.locator("[data-language-select]")).toHaveValue("en");
+  await expect(page.locator("[data-language-trigger]")).toContainText("EN");
   await page.getByRole("link", { name: "Typedoku Play", exact: true }).click();
   await expect(page.locator(".cell")).toHaveCount(36);
   await expect(page).toHaveTitle("Typedoku | Pokemon Quiz");

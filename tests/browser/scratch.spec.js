@@ -1,3 +1,4 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import {
@@ -71,6 +72,39 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-09-15T03:00:00Z"));
 });
 
+test("hover erasing works without a click and never intercepts search or menu keys", async ({
+  page,
+}) => {
+  await page.goto(path);
+  await ready(page);
+  const canvas = page.locator("#sc-mask");
+  await canvas.hover({ position: { x: 70, y: 70 } });
+  expect(
+    await page.evaluate(() => document.activeElement === document.body),
+  ).toBe(true);
+  const before = await pixels(page);
+  await page.keyboard.press("Space");
+  const first = await pixels(page);
+  expect(first.opaque).toBeLessThan(before.opaque);
+  await canvas.hover({ position: { x: 150, y: 150 } });
+  await page.keyboard.press("Enter");
+  expect((await pixels(page)).opaque).toBeLessThan(first.opaque);
+  await page.locator("#sc-input").focus();
+  await canvas.hover({ position: { x: 100, y: 100 } });
+  const editing = await pixels(page);
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
+  expect(await pixels(page)).toEqual(editing);
+  await expect(page.locator("#sc-input")).toHaveValue(" ");
+  await page.locator("[data-language-trigger]").click();
+  await canvas.hover({ position: { x: 120, y: 120 } });
+  await page.keyboard.press("Enter");
+  expect(await pixels(page)).toEqual(editing);
+  await page.reload();
+  await ready(page);
+  expect(await pixels(page)).toEqual(editing);
+});
+
 test("scratch is the sixth bilingual hub game, with real previews and only local assets", async ({
   page,
 }) => {
@@ -88,7 +122,7 @@ test("scratch is the sixth bilingual hub game, with real previews and only local
   await expect
     .poll(() => card.locator("img").evaluate((img) => img.naturalWidth))
     .toBeGreaterThan(300);
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   const en = page.getByRole("link", { name: "Poke Scratch Play", exact: true });
   expect(await en.locator("img").getAttribute("src")).not.toBe(ko);
   await en.click();
@@ -110,7 +144,7 @@ test("scratch is the sixth bilingual hub game, with real previews and only local
   );
   await act(page, "help").click();
   expect(await page.locator("#sc-dialog").innerText()).not.toMatch(/[가-힣]/);
-  await expect(page.locator(".trainer-rank-guide > div")).toHaveCount(6);
+  await expect(page.locator(".trainer-rank-guide")).toHaveCount(0);
   await act(page, "close-dialog").click();
   await page
     .getByRole("link", { name: "Pokemon Quiz home", exact: true })
@@ -149,7 +183,7 @@ test("the cover is opaque, real pixels render, and unique erased area survives r
   await ready(page);
   expect(await pixels(page)).toEqual(mask);
   await expect(page.locator("#sc-points")).toHaveText(points);
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await ready(page);
   expect(await pixels(page)).toEqual(mask);
   expect(await saved(page)).toEqual(first);
@@ -374,7 +408,7 @@ test("mobile touch reveals pixels without scrolling, and layouts fit Korean and 
     expect(await page.evaluate(() => scrollY)).toBe(before);
     const mask = await pixels(page);
     for (const language of ["ko", "en"]) {
-      await page.locator("[data-language-select]").selectOption(language);
+      await chooseLanguage(page, language);
       await ready(page);
       for (const width of [320, 390, 768, 1440]) {
         await page.setViewportSize({

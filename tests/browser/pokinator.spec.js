@@ -1,3 +1,4 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import {
@@ -126,7 +127,7 @@ test("the fifth hub game has real bilingual previews and the shared brand return
   const card = page.locator('.game-card[href="./pokinator.html"]');
   await expect(card.locator("h2")).toHaveText("포키네이터");
   const ko = await card.locator("img").getAttribute("src");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(card.locator("h2")).toHaveText("Pokinator");
   expect(await card.locator("img").getAttribute("src")).not.toBe(ko);
   expect(
@@ -172,7 +173,7 @@ for (const key of ["mew", "charizard-mega-x", "growlithe-hisui"]) {
       (key) => localStorage.getItem(key),
       STORAGE_KEY,
     );
-    await page.locator("[data-language-select]").selectOption("en");
+    await chooseLanguage(page, "en");
     await expect(page.locator("#pn-prompt")).toHaveText("Got it!");
     await expect(page.locator(".pn-character")).toContainText(
       candidate(key).english,
@@ -226,7 +227,7 @@ test("a real round narrows to Steven before naming him, then survives language c
       await expect(page.locator("#pn-prompt")).toHaveText(
         "성호가 사용하는 포켓몬인가요?",
       );
-      await page.locator("[data-language-select]").selectOption("en");
+      await chooseLanguage(page, "en");
       await expect(page.locator("#pn-prompt")).toHaveText(q.en);
       await page.reload();
       await expect(page.locator("#pn-prompt")).toHaveAttribute(
@@ -237,7 +238,7 @@ test("a real round narrows to Steven before naming him, then survives language c
       await expect(page.locator(".pn-guess")).toBeVisible();
       await page.locator('[data-action="undo"]').click();
       await expect(page.locator("#pn-prompt")).toHaveText(q.en);
-      await page.locator("[data-language-select]").selectOption("ko");
+      await chooseLanguage(page, "ko");
       await page.locator('[data-answer="yes"]').click();
       await expect(page.locator(".pn-character")).toContainText(target.name);
       await page.locator('[data-action="confirm"]').click();
@@ -287,13 +288,12 @@ test("unknown answers, keyboard input, history edits and navigation preserve the
     second,
   );
   await page.locator('[data-action="help"]').click();
-  await page.locator("[data-language-select]").evaluate((el) => {
-    el.value = "en";
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await page
+    .locator('[data-language-option="en"]')
+    .evaluate((el) => el.click());
   await expect(page.locator("#pn-dialog")).toBeVisible();
   await expect(page.locator("#pn-dialog-body")).toContainText(
-    "regional forms and Mega Evolutions",
+    "Can clever Kadabra guess the Pokemon on your mind?",
   );
   await page.keyboard.press("Escape");
   await expect(page.locator("#pn-prompt")).toBeFocused();
@@ -347,7 +347,7 @@ test("a yes to Red/Green ends debut questions through undo, reload and language 
   );
   await page.locator('[data-answer="yes"]').click();
   await page.reload();
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   let found = false;
   for (let i = 0; i < 30; i++) {
     if (await page.locator(".pn-question").count()) {
@@ -435,7 +435,7 @@ test("old single-Psychic memory survives migration and avoids implied questions 
   await seed(page, r);
   await expect(page.locator("#pn-updated")).toHaveCount(0);
   await expect(page.locator(".pn-counter strong")).toHaveText("4");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   let found = false;
   for (let step = 0; step < 30; step++) {
     if (await page.locator(".pn-question").count()) {
@@ -518,7 +518,7 @@ test("uncertain final guesses stay tentative and can use all three attempts", as
   }));
   await seed(page, r);
   await expect(page.locator(".pn-kicker")).toHaveText("가장 유력한 후보예요");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(page.locator(".pn-kicker")).toHaveText("This is my best guess");
   const names = new Set();
   for (let i = 0; i < 3; i++) {
@@ -563,7 +563,7 @@ test("question updates reset only incompatible progress and retain completed rec
     "완료한 기록은 유지됩니다.",
   );
   await expect(page.locator(".pn-counter strong")).toHaveText("0");
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(page.locator("#pn-updated")).toContainText(
     "completed records are kept",
   );
@@ -592,7 +592,7 @@ test("long game-title debut questions fit both languages and mobile sizes", asyn
     "추가 콘텐츠 포함",
   );
   for (const language of ["ko", "en"]) {
-    await page.locator("[data-language-select]").selectOption(language);
+    await chooseLanguage(page, language);
     for (const width of [320, 390, 1440]) {
       await page.setViewportSize({ width, height: 844 });
       expect(
@@ -646,7 +646,7 @@ for (const id of [
     );
     await page.goto("./pokinator.html");
     for (const language of ["ko", "en"]) {
-      await page.locator("[data-language-select]").selectOption(language);
+      await chooseLanguage(page, language);
       await expect(page.locator("#pn-prompt")).toHaveText(q[language]);
       await expect(page.locator("#pn-question-note")).toHaveText(
         q.note[language],
@@ -729,7 +729,7 @@ test("question notes are opt-in, keyboard accessible, dismissible and reset afte
   await page.locator(".pn-heading h1").click();
   await expect(note).toBeHidden();
   await toggle.click();
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(note).toBeHidden();
   await page.getByRole("button", { name: "Question details" }).hover();
   await expect(note).toHaveText(q.note.en);
@@ -806,7 +806,7 @@ test("the shorter third-stage question preserves existing progress and has no em
     "진화 계열의 세 번째 단계인가요?",
   );
   await expect(page.locator("#pn-note-toggle")).toHaveCount(0);
-  await page.locator("[data-language-select]").selectOption("en");
+  await chooseLanguage(page, "en");
   await expect(page.locator("#pn-prompt")).toHaveText(
     "Is it the third stage of its evolution line?",
   );
@@ -834,7 +834,7 @@ test("question, guess, shortlist, result and help fit mobile and desktop in both
     if (state === "complete")
       await page.locator('[data-action="confirm"]').click();
     for (const language of ["ko", "en"]) {
-      await page.locator("[data-language-select]").selectOption(language);
+      await chooseLanguage(page, language);
       for (const width of [320, 390, 1440]) {
         await page.setViewportSize({ width, height: width < 500 ? 844 : 1080 });
         const fits = await page.locator("#pn-stage").evaluate((el) => {

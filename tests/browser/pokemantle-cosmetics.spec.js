@@ -1,3 +1,4 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
@@ -23,7 +24,7 @@ for (const width of [390, 1440])
       await expect(options).toHaveCount(count);
     }
     for (const language of ["ko", "en"]) {
-      await page.locator("[data-language-select]").selectOption(language);
+      await chooseLanguage(page, language);
       for (const query of ["분떠도리", "Spewpa", "spewpa meadow", "spewpa polar", "665"]) {
         await input.fill(query);
         const choice = page.locator('#guess-options [data-guess="665"]');
@@ -34,7 +35,7 @@ for (const width of [390, 1440])
         if (query !== "665") await expect(options).toHaveCount(1);
       }
     }
-    await page.locator("[data-language-select]").selectOption(width === 390 ? "ko" : "en");
+    await chooseLanguage(page, width === 390 ? "ko" : "en");
     await input.fill("spewpa meadow");
     await input.press("Enter");
     await expect(page.locator("#answer-title")).toHaveText(width === 390 ? "분떠도리" : "Spewpa");

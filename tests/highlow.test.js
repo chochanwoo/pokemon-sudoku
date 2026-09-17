@@ -3,9 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   createHighLow,
-  STATS,
-  statInfo,
-  statValue,
+  TOTAL_STAT,
   profileKey,
   lastPracticeKey,
   MAX_QUESTIONS,
@@ -38,59 +36,29 @@ const read = (name) =>
 const catalog = read("pokemantle"),
   bundle = read("highlow");
 const game = createHighLow(catalog, bundle);
-const settings = { mode: "daily", day: "2026-09-11", difficulty: "hard" };
-const normal = { ...settings, difficulty: "normal" };
+const settings = { mode: "daily", day: "2026-09-11" };
 const opposite = (side) => (side === "left" ? "right" : "left");
 const restore = (value) => restoreRound(JSON.stringify(value), game, settings);
 
-test("streak ranks rise with correct answers and apply every difficulty boundary inclusively", () => {
-  for (const [difficulty, thresholds] of Object.entries({
-    normal: [20, 15, 10, 6, 3, 0],
-    hard: [12, 9, 6, 4, 2, 0],
-  })) {
-    assert.deepEqual(
-      HIGHLOW_STREAK_RANKS[difficulty].map((t) => t.min),
-      thresholds,
-    );
-    for (const [index, tier] of HIGHLOW_STREAK_RANKS[difficulty].entries()) {
-      assert.equal(streakRankFor(tier.min, difficulty), tier.rank);
-      if (index)
-        assert.equal(
-          streakRankFor(thresholds[index - 1] - 1, difficulty),
-          tier.rank,
-        );
-      if (tier.min)
-        assert.equal(
-          streakRankFor(tier.min - 1, difficulty),
-          GUESS_RANKS[index + 1].rank,
-        );
-    }
-    for (let count = 0; count <= MAX_QUESTIONS; count++) {
-      const index = thresholds.findIndex((min) => count >= min);
-      assert.equal(streakRankFor(count, difficulty), GUESS_RANKS[index].rank);
-      if (count)
-        assert.ok(
-          GUESS_RANKS.findIndex(
-            (t) => t.rank === streakRankFor(count - 1, difficulty),
-          ) >= index,
-        );
-    }
-    assert.equal(streakRankFor(0, difficulty), "E");
-    for (const count of [-1, 0.5, "12", null, undefined, NaN, Infinity])
-      assert.equal(streakRankFor(count, difficulty), null);
+test("streak ranks preserve every total-stat boundary", () => {
+  const thresholds = [20, 15, 10, 6, 3, 0];
+  assert.deepEqual(
+    HIGHLOW_STREAK_RANKS.map((t) => t.min),
+    thresholds,
+  );
+  for (let count = 0; count <= MAX_QUESTIONS; count++) {
+    const index = thresholds.findIndex((min) => count >= min);
+    assert.equal(streakRankFor(count), GUESS_RANKS[index].rank);
   }
-  for (const difficulty of ["", null, "invalid", "toString", "__proto__"])
-    assert.equal(streakRankFor(12, difficulty), null);
+  for (const count of [-1, 0.5, "12", null, undefined, NaN, Infinity])
+    assert.equal(streakRankFor(count), null);
 });
 
-test("streak ranks reuse the six trainers without changing the guess-based rankings", () => {
-  for (const ranks of Object.values(HIGHLOW_STREAK_RANKS)) {
-    assert.deepEqual(
-      ranks.map(({ min, ...trainer }) => trainer),
-      GUESS_RANKS.map(({ max, ...trainer }) => trainer),
-    );
-    assert.ok(ranks.every((tier) => !Object.hasOwn(tier, "max")));
-  }
+test("streak ranks reuse trainers without changing guess-based rankings", () => {
+  assert.deepEqual(
+    HIGHLOW_STREAK_RANKS.map(({ min, ...trainer }) => trainer),
+    GUESS_RANKS.map(({ max, ...trainer }) => trainer),
+  );
   assert.deepEqual(
     GUESS_RANKS.map((t) => t.max),
     [5, 10, 20, 30, 40, Infinity],
@@ -102,8 +70,7 @@ test("streak ranks reuse the six trainers without changing the guess-based ranki
   assert.equal(rankFor(0), null);
   assert.equal(rankFor(12), "B");
   assert.equal(rankFor(12, CLUE_GUESS_RANKS), "D");
-  assert.equal(streakRankFor(12, "normal"), "B");
-  assert.equal(streakRankFor(12, "hard"), "S");
+  assert.equal(streakRankFor(12), "B");
 });
 
 test("High Low matches every form to six ordered base stats without mutating the catalog", () => {
@@ -126,8 +93,7 @@ test("High Low matches every form to six ordered base stats without mutating the
   assert.ok(game.pokemon.some((p) => p.speciesId === 493));
   assert.ok(!byKey.has("arceus-unknown"));
   assert.ok(!byKey.has("pichu-spiky-eared"));
-  for (const stat of STATS)
-    if (stat.label !== "HP") assert.ok(english[stat.label]);
+  assert.ok(english[TOTAL_STAT.label]);
 });
 
 test("unknown stats and missing artwork never enter the question pool", () => {
@@ -162,11 +128,10 @@ test("mismatched or corrupt stat exports fail explicitly", () => {
 
 test("URL settings validate seeds, real dates, future dates and the Korean midnight boundary", () => {
   const today = "2026-09-11";
-  assert.deepEqual(settingsFromSearch("", today), normal);
+  assert.deepEqual(settingsFromSearch("", today), settings);
   assert.deepEqual(settingsFromSearch("?date=2026-09-10", today), {
     mode: "daily",
     day: "2026-09-10",
-    difficulty: "hard",
   });
   for (const query of [
     "?date=2026-02-30",
@@ -175,23 +140,25 @@ test("URL settings validate seeds, real dates, future dates and the Korean midni
     "?mode=practice&seed=%3Cscript%3E",
     "?mode=practice&seed=" + "a".repeat(65),
   ])
-    assert.deepEqual(settingsFromSearch(query, today), normal);
+    assert.deepEqual(settingsFromSearch(query, today), settings);
   assert.deepEqual(settingsFromSearch("?mode=practice&seed=a_-123", today), {
     mode: "practice",
     seed: "a_-123",
-    difficulty: "hard",
   });
   assert.deepEqual(settingsFromSearch("?difficulty=hard", today), settings);
   assert.deepEqual(
     settingsFromSearch("?difficulty=normal&date=2026-09-11", today),
-    normal,
+    settings,
   );
-  assert.deepEqual(settingsFromSearch("?difficulty=invalid", today), normal);
+  assert.deepEqual(settingsFromSearch("?difficulty=invalid", today), settings);
   assert.deepEqual(
     settingsFromSearch("?difficulty=normal&mode=practice&seed=example", today),
-    { mode: "practice", seed: "example", difficulty: "normal" },
+    { mode: "practice", seed: "example" },
   );
-  assert.throws(() => challengeKey({ ...settings, difficulty: "invalid" }));
+  assert.equal(
+    Object.hasOwn(settingsFromSearch("?difficulty=hard"), "difficulty"),
+    false,
+  );
   assert.equal(dayKey(new Date("2026-09-11T14:59:59Z")), "2026-09-11");
   assert.equal(dayKey(new Date("2026-09-11T15:00:00Z")), "2026-09-12");
   assert.throws(() => challengeKey({ mode: "other" }));
@@ -200,7 +167,7 @@ test("URL settings validate seeds, real dates, future dates and the Korean midni
 
 test("seeded sequences are stable, mode-isolated, cross-species and never tied", () => {
   const clone = createHighLow(catalog, bundle);
-  const practice = { mode: "practice", seed: "2026-09-11", difficulty: "hard" };
+  const practice = { mode: "practice", seed: "2026-09-11" };
   assert.notEqual(storageKey(game, settings), storageKey(game, practice));
   assert.notDeepEqual(game.question(settings, 0), game.question(practice, 0));
   assert.notDeepEqual(
@@ -214,40 +181,24 @@ test("seeded sequences are stable, mode-isolated, cross-species and never tied",
       b = game.byId.get(q.right);
     assert.deepEqual(q, clone.question(settings, i));
     assert.notEqual(a.speciesId, b.speciesId);
-    assert.notEqual(a.stats[q.stat], b.stats[q.stat]);
-    assert.equal(
-      q.winner,
-      a.stats[q.stat] > b.stats[q.stat] ? "left" : "right",
-    );
+    assert.notEqual(a.bst, b.bst);
+    assert.equal(q.winner, a.bst > b.bst ? "left" : "right");
     if (q.winner === "left") leftWins++;
   }
   assert.ok(leftWins > 350 && leftWins < 650);
-  for (let start = 0; start < 60; start += 6)
-    assert.equal(
-      new Set(
-        Array.from(
-          { length: 6 },
-          (_, i) => game.question(settings, start + i).stat,
-        ),
-      ).size,
-      6,
-    );
   for (const index of [-1, 1.5, MAX_QUESTIONS])
     assert.throws(() => game.question(settings, index));
 });
 
-test("Normal always compares actual base stat totals and excludes equal totals", () => {
+test("Every question compares actual base stat totals and excludes equal totals", () => {
   const another = createHighLow(catalog, bundle);
   for (const p of game.pokemon)
     assert.equal(
       p.bst,
       p.stats.reduce((a, b) => a + b, 0),
     );
-  assert.equal(statInfo("bst").label, "종족값 합계");
-  for (const mode of [
-    normal,
-    { mode: "practice", seed: "totals", difficulty: "normal" },
-  ]) {
+  assert.equal(TOTAL_STAT.label, "종족값 합계");
+  for (const mode of [settings, { mode: "practice", seed: "totals" }]) {
     for (let i = 0; i < MAX_QUESTIONS; i++) {
       const q = game.question(mode, i),
         a = game.byId.get(q.left),
@@ -255,86 +206,85 @@ test("Normal always compares actual base stat totals and excludes equal totals",
       assert.equal(q.stat, "bst");
       assert.notEqual(a.bst, b.bst);
       assert.notEqual(a.speciesId, b.speciesId);
-      assert.equal(statValue(a, q.stat), a.bst);
       assert.equal(q.winner, a.bst > b.bst ? "left" : "right");
       assert.deepEqual(q, another.question(mode, i));
     }
   }
 });
 
-test("Hard preserves the pre-difficulty daily sequence, shared links and saved progress", () => {
+test("existing total-stat sequences, shared links and saved progress survive", () => {
   const expected = [
-    { index: 0, stat: 0, left: 988, right: 1009, winner: "right" },
-    { index: 1, stat: 3, left: 370, right: 43, winner: "right" },
-    { index: 2, stat: 2, left: 921, right: 1005, winner: "right" },
-    { index: 3, stat: 1, left: 10207, right: 10230, winner: "right" },
-    { index: 4, stat: 4, left: 516, right: 10408, winner: "left" },
-    { index: 5, stat: 5, left: 10208, right: 337, winner: "left" },
+    { index: 0, stat: "bst", left: 10215, right: 719, winner: "right" },
+    { index: 1, stat: "bst", left: 387, right: 533, winner: "right" },
+    { index: 2, stat: "bst", left: 534, right: 607, winner: "left" },
+    { index: 3, stat: "bst", left: 511, right: 484, winner: "right" },
+    { index: 4, stat: "bst", left: 450, right: 313, winner: "left" },
+    { index: 5, stat: "bst", left: 324, right: 889, winner: "right" },
   ];
   assert.deepEqual(
     expected.map((_, i) => game.question(settings, i)),
     expected,
   );
-  assert.equal(challengeKey(settings), "daily:2026-09-11");
+  assert.equal(challengeKey(settings), "normal:daily:2026-09-11");
   assert.equal(
     storageKey(game, settings),
-    `highlow:${game.version}:daily:2026-09-11`,
+    `highlow:${game.version}:normal:daily:2026-09-11`,
   );
-  assert.equal(profileKey(game, settings), `highlow:${game.version}`);
-  assert.equal(lastPracticeKey(settings), "highlow:last-practice");
+  assert.equal(profileKey(game), `highlow:${game.version}:normal`);
+  assert.equal(lastPracticeKey(), "highlow:normal:last-practice");
   const old = {
     version: game.version,
-    challenge: "daily:2026-09-11",
+    challenge: "normal:daily:2026-09-11",
     choices: ["right", "right"],
     revealed: false,
   };
   assert.deepEqual(restore(old), old);
   assert.equal(currentIndex(restore(old)), 2);
-  assert.equal(
-    settingsFromSearch("?date=2026-09-11", "2026-09-11").difficulty,
-    "hard",
-  );
-  assert.equal(
-    settingsFromSearch("?mode=practice&seed=cover7650").difficulty,
-    "hard",
-  );
-  assert.deepEqual(
-    game.question(
-      { mode: "practice", seed: "cover7650", difficulty: "hard" },
-      0,
-    ),
-    { index: 0, stat: 2, left: 9, right: 149, winner: "left" },
-  );
 });
 
-test("difficulty-specific rounds and record keys cannot overwrite or restore one another", () => {
-  for (const base of [
-    { mode: "daily", day: "2026-09-11" },
-    { mode: "practice", seed: "same-seed" },
-  ]) {
-    const hard = { ...base, difficulty: "hard" },
-      normal = { ...base, difficulty: "normal" };
-    assert.notEqual(storageKey(game, hard), storageKey(game, normal));
-    assert.notEqual(profileKey(game, hard), profileKey(game, normal));
-    assert.notEqual(lastPracticeKey(hard), lastPracticeKey(normal));
-    assert.notDeepEqual(game.question(hard, 0), game.question(normal, 0));
-    for (const [a, b] of [
-      [hard, normal],
-      [normal, hard],
-    ]) {
-      const round = newRound(game, a);
-      submitChoice(round, game, a, game.question(a, 0).winner);
-      nextQuestion(round, game, a);
-      submitChoice(round, game, a, opposite(game.question(a, 1).winner));
-      assert.equal(score(round, game, a), 1);
-      assert.ok(isEnded(round, game, a));
-      assert.deepEqual(restoreRound(JSON.stringify(round), game, a), round);
-      assert.deepEqual(
-        restoreRound(JSON.stringify(round), game, b),
-        newRound(game, b),
+test("retired individual-stat saves never become total-stat progress", () => {
+  for (const base of [settings, { mode: "practice", seed: "same-seed" }]) {
+    const fresh = newRound(game, base);
+    const retired = {
+      ...fresh,
+      challenge: fresh.challenge.replace("normal:", ""),
+      choices: ["right"],
+      revealed: true,
+    };
+    assert.deepEqual(restoreRound(JSON.stringify(retired), game, base), fresh);
+    for (const difficulty of ["hard", "normal", "invalid"]) {
+      const search =
+        base.mode === "daily"
+          ? `?date=${base.day}`
+          : `?mode=practice&seed=${base.seed}`;
+      const parsed = settingsFromSearch(
+        search + "&difficulty=" + difficulty,
+        "2026-09-11",
       );
+      assert.deepEqual(parsed, base);
+      assert.equal(game.question(parsed, 0).stat, "bst");
     }
   }
+});
+
+test("total-stat comparisons allow ties in individual stats but never total ties", () => {
+  const pair = catalog.pokemon.filter((p) =>
+    ["bulbasaur", "ivysaur"].includes(p.key),
+  );
+  const subset = { ...catalog, pokemon: pair };
+  const data = {
+    ...bundle,
+    pokemon: pair.map((p, i) => ({
+      id: p.id,
+      pokemonId: p.pokemonId,
+      speciesId: p.speciesId,
+      stats: [50 + i, 50, 50, 50, 50, 50],
+    })),
+  };
+  const g = createHighLow(subset, data);
+  assert.equal(g.question(settings, 0).stat, "bst");
+  data.pokemon[1].stats = [50, 50, 50, 50, 50, 50];
+  assert.throws(() => createHighLow(subset, data), /comparable/);
 });
 
 test("correct picks reveal once, preserve the current pair and require explicit advancement", () => {

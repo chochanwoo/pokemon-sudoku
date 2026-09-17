@@ -17,38 +17,6 @@
 .hl-mode button {
   min-height: 40px;
 }
-.hl-difficulty-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 20px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.hl-difficulty button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 82px;
-  min-height: 40px;
-}
-.hl-difficulty svg {
-  width: 16px;
-  height: 16px;
-}
-.hl-difficulty [data-difficulty="hard"].active {
-  color: #b83f4f;
-}
-.hl-main[data-difficulty-mode="hard"] .hl-question-heading h2 svg {
-  color: #b83f4f;
-}
-.hl-record-mode {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: var(--muted);
-}
 .hl-result-mode {
   margin-bottom: 12px;
 }

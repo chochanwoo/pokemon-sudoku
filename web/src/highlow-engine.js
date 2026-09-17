@@ -1,30 +1,25 @@
-import { hash, random, shuffle, dayKey } from "./engine.js";
+import { hash, random, dayKey } from "./engine.js";
 import { validDay, resolveDay } from "./similarity-engine.js";
 import { isPlayableForm } from "./form-policy.js";
 
 export { dayKey };
-export const STATS = [
-  { key: "hp", label: "HP", icon: "heart" },
-  { key: "attack", label: "공격", icon: "swords" },
-  { key: "defense", label: "방어", icon: "shield" },
-  { key: "special_attack", label: "특수공격", icon: "sparkles" },
-  { key: "special_defense", label: "특수방어", icon: "shield-plus" },
-  { key: "speed", label: "스피드", icon: "zap" },
+const STAT_KEYS = [
+  "hp",
+  "attack",
+  "defense",
+  "special_attack",
+  "special_defense",
+  "speed",
 ];
 export const MAX_QUESTIONS = 1000;
-const TOTAL_STAT = {
+export const TOTAL_STAT = {
   key: "bst",
   label: "종족값 합계",
   icon: "chart-no-axes-column",
 };
-export const statInfo = (stat) => (stat === "bst" ? TOTAL_STAT : STATS[stat]);
-export const statValue = (pokemon, stat) =>
-  stat === "bst" ? pokemon.bst : pokemon.stats[stat];
-export const difficultyOf = (settings) => settings.difficulty ?? "normal";
-export const profileKey = (game, settings) =>
-  `highlow:${game.version}${difficultyOf(settings) === "normal" ? ":normal" : ""}`;
-export const lastPracticeKey = (settings) =>
-  `highlow:${difficultyOf(settings) === "normal" ? "normal:" : ""}last-practice`;
+// Keep the total-stat game's existing save keys and daily sequence.
+export const profileKey = (game) => `highlow:${game.version}:normal`;
+export const lastPracticeKey = () => "highlow:normal:last-practice";
 export const validSeed = (seed) =>
   typeof seed === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(seed);
 export function settingsFromSearch(search, today = dayKey()) {
@@ -32,26 +27,15 @@ export function settingsFromSearch(search, today = dayKey()) {
   const practice =
     params.get("mode") === "practice" && validSeed(params.get("seed"));
   const date = params.get("date");
-  // Old shared links described individual-stat games, now named Hard.
-  const legacy =
-    !params.has("difficulty") &&
-    (practice || (validDay(date) && date <= today));
-  const difficulty =
-    params.get("difficulty") === "hard" || legacy ? "hard" : "normal";
   return practice
-    ? { mode: "practice", seed: params.get("seed"), difficulty }
-    : { mode: "daily", day: resolveDay(date, today), difficulty };
+    ? { mode: "practice", seed: params.get("seed") }
+    : { mode: "daily", day: resolveDay(date, today) };
 }
 export function challengeKey(settings) {
-  const difficulty = difficultyOf(settings);
-  if (!["normal", "hard"].includes(difficulty))
-    throw new Error("Invalid High Low difficulty");
-  // Hard retains the original seed and storage identity so existing rounds survive.
-  const prefix = difficulty === "normal" ? "normal:" : "";
   if (settings.mode === "daily" && validDay(settings.day))
-    return `${prefix}daily:${settings.day}`;
+    return `normal:daily:${settings.day}`;
   if (settings.mode === "practice" && validSeed(settings.seed))
-    return `${prefix}practice:${settings.seed}`;
+    return `normal:practice:${settings.seed}`;
   throw new Error("Invalid High Low challenge");
 }
 
@@ -60,7 +44,7 @@ export function createHighLow(catalog, bundle) {
     bundle.version !== "highlow-v1" ||
     bundle.catalogVersion !== catalog.version ||
     !/^[a-f0-9]{16}$/.test(bundle.dataVersion) ||
-    JSON.stringify(bundle.stats) !== JSON.stringify(STATS.map((s) => s.key)) ||
+    JSON.stringify(bundle.stats) !== JSON.stringify(STAT_KEYS) ||
     !Array.isArray(bundle.pokemon) ||
     bundle.pokemon.length !== catalog.pokemon.length
   )
@@ -77,7 +61,7 @@ export function createHighLow(catalog, bundle) {
         row.speciesId !== p.speciesId ||
         (row.stats !== null &&
           (!Array.isArray(row.stats) ||
-            row.stats.length !== STATS.length ||
+            row.stats.length !== STAT_KEYS.length ||
             !row.stats.every((n) => Number.isInteger(n) && n > 0 && n <= 999)))
       )
         throw new Error("Invalid High Low stats");
@@ -97,21 +81,10 @@ export function createHighLow(catalog, bundle) {
   const bySpecies = new Map(
     species.map((id) => [id, pokemon.filter((p) => p.speciesId === id)]),
   );
-  // Every stat needs at least one cross-species comparison with unequal values.
-  const fallback = new Map(
-    [...STATS.keys(), "bst"].map((stat) => [
-      stat,
-      pokemon.find((a) =>
-        pokemon.some(
-          (b) =>
-            a.speciesId !== b.speciesId &&
-            statValue(a, stat) !== statValue(b, stat),
-        ),
-      ),
-    ]),
+  const fallback = pokemon.find((a) =>
+    pokemon.some((b) => a.speciesId !== b.speciesId && a.bst !== b.bst),
   );
-  if ([...fallback.values()].some((p) => !p))
-    throw new Error("Not enough comparable Pokemon");
+  if (!fallback) throw new Error("Not enough comparable Pokemon");
   const version = `${bundle.version}:${bundle.dataVersion}`;
   function question(settings, index) {
     if (!Number.isInteger(index) || index < 0 || index >= MAX_QUESTIONS)
@@ -119,35 +92,24 @@ export function createHighLow(catalog, bundle) {
     const key = `${version}:${challengeKey(settings)}`;
     const rng = random(hash(`${key}:pair:${index}`));
     const pick = (list) => list[Math.floor(rng() * list.length)];
-    const stat =
-      difficultyOf(settings) === "normal"
-        ? "bst"
-        : shuffle(
-            STATS.map((_, i) => i),
-            random(hash(`${key}:stats`)),
-          )[index % STATS.length];
     let left = pick(bySpecies.get(pick(species)));
     let candidates = pokemon.filter(
-      (p) =>
-        p.speciesId !== left.speciesId &&
-        statValue(p, stat) !== statValue(left, stat),
+      (p) => p.speciesId !== left.speciesId && p.bst !== left.bst,
     );
     if (!candidates.length) {
-      left = fallback.get(stat);
+      left = fallback;
       candidates = pokemon.filter(
-        (p) =>
-          p.speciesId !== left.speciesId &&
-          statValue(p, stat) !== statValue(left, stat),
+        (p) => p.speciesId !== left.speciesId && p.bst !== left.bst,
       );
     }
     const rightSpecies = pick([...new Set(candidates.map((p) => p.speciesId))]);
     const right = pick(candidates.filter((p) => p.speciesId === rightSpecies));
     return {
       index,
-      stat,
+      stat: "bst",
       left: left.id,
       right: right.id,
-      winner: statValue(left, stat) > statValue(right, stat) ? "left" : "right",
+      winner: left.bst > right.bst ? "left" : "right",
     };
   }
   return { version, pokemon, byId, question };

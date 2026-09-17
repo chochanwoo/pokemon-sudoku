@@ -1,3 +1,4 @@
+import { chooseLanguage } from "../../scripts/browser-language.mjs";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import {
@@ -184,7 +185,7 @@ for (const setup of setups) {
         ["ko", ko],
         ["en", en],
       ]) {
-        await page.locator("[data-language-select]").selectOption(language);
+        await chooseLanguage(page, language);
         await expect(page.locator(setup.rank)).toContainText(name);
         await page.locator('[data-action="trainer-result"]').click();
         const popup = page.locator(`${setup.dialog}.trainer-dialog`);
@@ -282,10 +283,9 @@ for (const setup of setups) {
           el.scrollWidth <= el.clientWidth,
       ),
     ).toBe(true);
-    await page.locator("[data-language-select]").evaluate((el) => {
-      el.value = "en";
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await page
+      .locator('[data-language-option="en"]')
+      .evaluate((el) => el.click());
     await expect(popup).toBeVisible();
     await expect(popup.locator(".trainer-award-title")).toHaveText("Red tier");
     await page.evaluate(() => {

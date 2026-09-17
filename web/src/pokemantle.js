@@ -1,7 +1,7 @@
 import {
   createIcons,
   ScanSearch,
-  Gamepad2,
+  TreePalm,
   CircleHelp,
   ChartNoAxesColumn,
   Search,
@@ -38,7 +38,6 @@ import {
   rankName,
   trainerBadge,
   trainerReplay,
-  trainerGuide,
   trainerResult,
   onTrainerImageError,
 } from "./trainer-results.js";
@@ -55,7 +54,7 @@ import "./pokemantle.css";
 
 const icons = {
   ScanSearch,
-  Gamepad2,
+  TreePalm,
   CircleHelp,
   ChartNoAxesColumn,
   Search,
@@ -675,7 +674,7 @@ function onClick(event) {
     case "help":
       dialog(
         "포맨틀 규칙",
-        `<ul class="rules"><li>${t("하루에 한 포켓몬을 맞힙니다. 무늬·색상 등 외형만 다른 모습은 하나로 합칩니다. 리전 폼·메가진화 등 전투 특성이 다른 모습은 별개의 정답이며, 일부 이벤트·기념용 모습은 제외됩니다.")}</li><li>${t("유사도가 높을수록 정답과 가깝습니다. 정답은 <strong>100점, 1위</strong>이며 같은 점수는 공동 순위입니다.")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li><li>${t("정답을 맞히기까지 사용한 횟수로 트레이너 등급을 받습니다.")}</li><li>${t("한국 시간 자정에 다음 문제가 열립니다. 진행 상황은 이 브라우저에 저장됩니다.")}</li></ul>${trainerGuide()}`,
+        `<ul class="rules"><li>${t("오늘의 포켓몬을 맞혀보세요!")}</li><li>${t("오늘의 포켓몬에 대한 힌트가 유사도로 주어집니다! 유사도가 높을수록 정답과 가깝습니다.")}</li><li>${t("유사도에는 타입, 특성, 알 그룹, 도감 설명, 배우는 기술, 모티브 요소 등 거의 모든 것이 포함됩니다!")}</li><li>${t("힌트는 지금보다 가까운 포켓몬을 최대 3번 공개하며 시도 횟수에 포함됩니다.")}</li></ul><p class="dialog-copy">${t("오늘의 포켓몬은 한국 시간 자정에 변경됩니다.")}</p>`,
       );
       break;
     case "stats": {

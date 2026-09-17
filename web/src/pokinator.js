@@ -1,6 +1,6 @@
 import {
   createIcons,
-  Gamepad2,
+  TreePalm,
   Languages,
   CircleHelp,
   ChartNoAxesColumn,
@@ -38,7 +38,7 @@ import "./style.css";
 import "./pokinator.css";
 
 const icons = {
-  Gamepad2,
+  TreePalm,
   Languages,
   CircleHelp,
   ChartNoAxesColumn,
@@ -147,7 +147,7 @@ function portraitPanel() {
       ? view.guess
       : view.kind === "complete"
         ? game.byId.get(round.result.id)
-        : catalog.pokemon.find((p) => p.id === 65);
+        : catalog.pokemon.find((p) => p.id === 64);
   return `<div class="pn-character ${view.kind === "question" ? "is-thinking" : ""}">${sprite(character, "pn-portrait")}<span>${view.kind === "question" || view.kind === "shortlist" ? t("포키네이터") : esc(name(character))}</span></div>`;
 }
 function stage() {
@@ -290,7 +290,7 @@ function showDialog(state) {
   let title, body;
   if (state.kind === "help") {
     title = "게임 규칙";
-    body = `<ul class="dialog-list"><li>${t("정답 범위는 기본 모습, 리전폼, 메가진화입니다. 전설과 환상의 포켓몬도 포함됩니다.")}</li><li>${t("거다이맥스, 지가르데의 비율별 모습, 무늬와 기념폼은 원본으로 합칩니다. 합쳐진 포켓몬은 기본 모습 기준입니다.")}</li><li>${t("메가진화는 X·Y 등 각각의 모습을 구분합니다. 타입과 특성은 생각한 모습 기준입니다.")}</li><li>${t("질문은 최대 25개, 추측은 최대 3회입니다. 모르는 정보는 모르겠습니다로 답해도 됩니다.")}</li><li>${t("이전 답변을 바꾸면 그 이후의 문답부터 다시 추리합니다.")}</li></ul>`;
+    body = `<ul class="dialog-list"><li>${t("똑똑한 윤겔라가 당신이 생각한 포켓몬을 맞힐 수 있을까요?")}</li><li>${t("질문은 최대 25개, 추측은 최대 3회입니다.")}</li><li>${t("뒤로가기를 통해 이전 질문의 답변을 바꿀 수 있습니다. 답변을 바꾸면 그 이후의 문답부터 다시 추리합니다.")}</li></ul>`;
   } else if (state.kind === "new") {
     title = "새 도전을 시작할까요?";
     body = `<p class="dialog-copy">${t("진행 중인 문답은 초기화됩니다. 완료한 기록은 유지됩니다.")}</p><div class="pn-dialog-actions"><button class="text-button" data-action="close-dialog">${t("취소")}</button><button class="primary-button" data-action="restart">${icon("rotate-cw")}${t("새 포켓몬으로 도전")}</button></div>`;
