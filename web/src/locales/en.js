@@ -50,7 +50,6 @@ export default {
     "The more you scratch away, the fewer points you earn!",
   "데일리 문제는 한국 시간 자정에 변경됩니다.":
     "New daily pictures arrive at midnight in Korea (UTC+9).",
-  "잠깐 쉬어가도 괜찮아.": "A little island time.",
   "라이츄 (알로라)": "Alolan Raichu",
   나몰빼미: "Rowlet",
   "포케 스크래치": "Poke Scratch",

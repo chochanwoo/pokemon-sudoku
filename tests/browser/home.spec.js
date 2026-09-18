@@ -54,6 +54,10 @@ test("Alola masthead keeps real sprites and the first game visible in both langu
       language === "ko" ? "비공식 팬 게임" : "Unofficial fan game",
     );
     await expect(page.locator(".hub-intro h1")).toHaveText("Alola.");
+    await expect(page.locator(".hub-intro p")).toHaveCount(0);
+    await expect(page.locator(".hub-intro")).not.toContainText(
+      /잠깐 쉬어가도 괜찮아|A little island time/,
+    );
     await expect(page.locator(".brand-caption")).toHaveText(
       language === "ko" ? "포켓몬 퀴즈" : "Pokemon Quiz",
     );

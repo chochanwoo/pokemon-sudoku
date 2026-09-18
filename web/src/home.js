@@ -33,7 +33,7 @@ function renderHome() {
     <main class="main hub-main">
       <div class="hub-intro">
         <img class="hub-scenery" src="${resort}" alt="" width="2172" height="724" fetchpriority="high" draggable="false" />
-        <div class="hub-intro-inner"><div class="hub-welcome"><span class="hub-island-label">ALOLA ISLAND</span><h1>Alola<span>.</span></h1><p>${t("잠깐 쉬어가도 괜찮아.")}</p></div><div class="hub-residents"><img src="${raichu}" alt="${t("라이츄 (알로라)")}" width="96" height="96" draggable="false" /><img src="${rowlet}" alt="${t("나몰빼미")}" width="80" height="80" draggable="false" /></div></div>
+        <div class="hub-intro-inner"><div class="hub-welcome"><span class="hub-island-label">ALOLA ISLAND</span><h1>Alola<span>.</span></h1></div><div class="hub-residents"><img src="${raichu}" alt="${t("라이츄 (알로라)")}" width="96" height="96" draggable="false" /><img src="${rowlet}" alt="${t("나몰빼미")}" width="80" height="80" draggable="false" /></div></div>
       </div>
       <section class="hub-games" aria-labelledby="games-title">
         <div class="hub-heading"><h2 id="games-title">${t("전체 게임")}</h2></div>

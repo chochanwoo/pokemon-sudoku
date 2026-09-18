@@ -47,15 +47,10 @@
   font-size: 52px;
   line-height: 1.2;
   font-weight: 750;
-  margin: 0 0 9px;
+  margin: 0;
 }
 .hub-intro h1 span {
   color: #ad4837;
-}
-.hub-intro p {
-  font-size: 13px;
-  line-height: 1.6;
-  font-weight: 550;
 }
 .hub-residents {
   display: flex;
@@ -245,7 +240,7 @@
 }
 .cover-lycanroc {
   left: 55%;
-  top: 22%;
+  top: 27%;
   width: 28%;
   height: 41%;
   filter: drop-shadow(0 3px 2px #254e3926);
@@ -394,9 +389,6 @@
   }
   .hub-intro h1 {
     font-size: 38px;
-  }
-  .hub-intro p {
-    font-size: 12px;
   }
   .hub-island-label {
     font-size: 9px;
