@@ -19,6 +19,7 @@ import {
 import {
   createHighLow,
   TOTAL_STAT,
+  HARD_MAX_GAP,
   profileKey,
   lastPracticeKey,
   MAX_QUESTIONS,
@@ -97,8 +98,10 @@ const streak = () => score(round, game, settings);
 const resultRank = () => (ended() ? streakRankFor(streak()) : null);
 const trainerKey = (challenge = challengeKey(settings), wins = streak()) =>
   trainerResultKey("highlow", challenge, wins);
-const recordsKey = () => `${profileKey(game)}:records`;
-const bestKey = () => `${profileKey(game)}:best`;
+const difficultyName = () => t(settings.difficulty === "hard" ? "하드" : "일반");
+const difficultySettings = () => settings.difficulty === "hard" ? { difficulty: "hard" } : {};
+const recordsKey = () => `${profileKey(game, settings)}:records`;
+const bestKey = () => `${profileKey(game, settings)}:best`;
 function read(key) {
   try {
     return localStorage.getItem(key);
@@ -182,7 +185,7 @@ function mount() {
   app.innerHTML = `<header class="site-header"><div class="header-inner">${siteBrand()}<nav class="header-actions" aria-label="${t("게임 메뉴")}">${languagePicker()}${tool("stats", "내 기록", "chart-no-axes-column")}${tool("help", "게임 규칙", "circle-help")}</nav></div></header>
   <main class="main hl-main resort-main">
     <div class="hl-day-banner" id="hl-new-day" hidden><span>${t("새로운 오늘의 대결이 열렸어요.")}</span><button class="text-button" data-action="daily">${icon("rotate-cw")}${t("오늘의 문제")}</button></div>
-    <section class="hl-heading resort-heading"><div><div class="eyebrow" id="hl-date"></div><h1>${t("포케 하이로우")}</h1></div><div class="segmented hl-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div></section>
+    <section class="hl-heading resort-heading"><div><div class="eyebrow" id="hl-date"></div><h1>${t("포케 하이로우")}</h1></div><div class="hl-controls"><div class="segmented hl-mode" role="group" aria-label="${t("게임 모드")}"><button data-action="daily">${t("데일리")}</button><button data-action="practice">${t("연습")}</button></div><div class="segmented hl-difficulty" role="group" aria-label="${t("난이도")}"><button data-difficulty="normal">${t("일반")}</button><button data-difficulty="hard">${t("하드")}</button></div></div></section>
     <div class="hl-summary" aria-label="${t("현재 기록")}"><div class="hl-streak">${icon("flame")}<span>${t("연속 정답")}<strong id="hl-streak">0</strong></span></div><div class="hl-best">${icon("trophy")}<span>${t("내 최고")}<strong id="hl-best">0</strong></span></div></div>
     <p class="hl-warning" id="hl-save-warning" role="status" hidden>${t("브라우저 저장 공간을 사용할 수 없어 진행 상황이 저장되지 않습니다.")}</p>
     <section id="hl-arena" aria-labelledby="hl-question"><div class="hl-question-heading"><span id="hl-round-number"></span><h2 id="hl-question"></h2></div><div id="hl-duel" class="hl-duel"></div></section>
@@ -229,11 +232,12 @@ function start(next, navigate = false) {
   clearTimeout(toastTimer);
   document.querySelector("#hl-toast").textContent = "";
   settings = next;
-  if (next.mode === "practice") save(lastPracticeKey(), next.seed);
+  if (next.mode === "practice") save(lastPracticeKey(next), next.seed);
   if (navigate) {
     const url = new URL(location.href);
     url.search = "";
     url.hash = "";
+    if (next.difficulty === "hard") url.searchParams.set("difficulty", "hard");
     if (next.mode === "practice") {
       url.searchParams.set("mode", "practice");
       url.searchParams.set("seed", next.seed);
@@ -252,6 +256,11 @@ function render() {
     `${icon("calendar-days")} ${settings.mode === "daily" ? esc(settings.day.replaceAll("-", ".")) : t("연습")}`;
   document.querySelectorAll(".hl-mode button").forEach((el) => {
     const active = el.dataset.action === settings.mode;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-pressed", active);
+  });
+  document.querySelectorAll("[data-difficulty]").forEach((el) => {
+    const active = el.dataset.difficulty === (settings.difficulty || "normal");
     el.classList.toggle("active", active);
     el.setAttribute("aria-pressed", active);
   });
@@ -334,7 +343,7 @@ function showResult() {
     b = game.byId.get(q.right);
   dialog(
     "도전 완료",
-    `<div class="hl-result-summary" data-trainer-rank="${resultRank()}"><span class="hl-result-mode">${t(settings.mode === "daily" ? "데일리" : "연습")}</span><div class="hl-award" aria-label="${t("당신의 트레이너 등급")}">${trainerBadge(resultRank(), "hl-award-badge", trainerKey())}</div>${trainerTaunt(resultRank())}<strong>${streak()}</strong><span>${t("연속 정답")}</span><p>${streak() > 0 && streak() === best() ? `${icon("trophy")}${t("최고 기록!")}` : t("다음 도전을 기다릴게요.")}</p></div><div class="hl-last-duel"><p>${t(TOTAL_STAT.label)}</p><div>${[a, b].map((p) => `<div>${sprite(p)}<span>${esc(pokemonName(p))}</span><strong>${p.bst}</strong></div>`).join("")}</div></div><div class="hl-result-actions"><button class="primary-button wide" data-action="share">${icon("share-2")}${t("결과 공유")}</button><button class="text-button" data-action="start-practice">${icon("rotate-cw")}${t("새 연습")}</button></div>`,
+    `<div class="hl-result-summary" data-trainer-rank="${resultRank()}"><span class="hl-result-mode">${t(settings.mode === "daily" ? "데일리" : "연습")}${settings.difficulty === "hard" ? ` · ${difficultyName()}` : ""}</span><div class="hl-award" aria-label="${t("당신의 트레이너 등급")}">${trainerBadge(resultRank(), "hl-award-badge", trainerKey())}</div>${trainerTaunt(resultRank())}<strong>${streak()}</strong><span>${t("연속 정답")}</span><p>${streak() > 0 && streak() === best() ? `${icon("trophy")}${t("최고 기록!")}` : t("다음 도전을 기다릴게요.")}</p></div><div class="hl-last-duel"><p>${t(TOTAL_STAT.label)}</p><div>${[a, b].map((p) => `<div>${sprite(p)}<span>${esc(pokemonName(p))}</span><strong>${p.bst}</strong></div>`).join("")}</div></div><div class="hl-result-actions"><button class="primary-button wide" data-action="share">${icon("share-2")}${t("결과 공유")}</button><button class="text-button" data-action="start-practice">${icon("rotate-cw")}${t("새 연습")}</button></div>`,
     true,
   );
 }
@@ -343,14 +352,15 @@ function newPractice() {
     {
       mode: "practice",
       seed: crypto.randomUUID(),
+      ...difficultySettings(),
     },
     true,
   );
 }
-function resumePractice() {
+function resumePractice(difficulty = difficultySettings()) {
   let seed;
   try {
-    seed = JSON.parse(read(lastPracticeKey()));
+    seed = JSON.parse(read(lastPracticeKey(difficulty)));
   } catch {
     /* Invalid saved seeds start a new practice. */
   }
@@ -358,6 +368,7 @@ function resumePractice() {
     {
       mode: "practice",
       seed: validSeed(seed) ? seed : crypto.randomUUID(),
+      ...difficulty,
     },
     true,
   );
@@ -367,12 +378,13 @@ async function share() {
   const url = new URL(location.href);
   url.search = "";
   url.hash = "";
+  if (settings.difficulty === "hard") url.searchParams.set("difficulty", "hard");
   if (settings.mode === "daily") url.searchParams.set("date", settings.day);
   else {
     url.searchParams.set("mode", "practice");
     url.searchParams.set("seed", settings.seed);
   }
-  const text = `${t("포케 하이로우")} · ${settings.mode === "daily" ? settings.day : t("연습")}\n${rankName(resultRank(), trainerKey())} · ${t("{count}연속 정답", { count: streak() })}\n${url.href}`;
+  const text = `${t("포케 하이로우")}${settings.difficulty === "hard" ? ` · ${difficultyName()}` : ""} · ${settings.mode === "daily" ? settings.day : t("연습")}\n${rankName(resultRank(), trainerKey())} · ${t("{count}연속 정답", { count: streak() })}\n${url.href}`;
   try {
     if (navigator.share && matchMedia("(max-width:800px)").matches)
       await navigator.share({ title: t("포케 하이로우"), text });
@@ -397,6 +409,14 @@ async function share() {
 function onClick(event) {
   const choice = event.target.closest("[data-choice]");
   if (choice) return choose(choice.dataset.choice);
+  const difficulty = event.target.closest("[data-difficulty]")?.dataset.difficulty;
+  if (["normal", "hard"].includes(difficulty)) {
+    if (difficulty === (settings.difficulty || "normal")) return;
+    const next = difficulty === "hard" ? { difficulty: "hard" } : {};
+    if (settings.mode === "practice") resumePractice(next);
+    else start({ mode: "daily", day: settings.day, ...next }, true);
+    return;
+  }
   const action = event.target.closest("[data-action]")?.dataset.action;
   switch (action) {
     case "next":
@@ -409,7 +429,7 @@ function onClick(event) {
       }
       break;
     case "daily":
-      start({ mode: "daily", day: dayKey() }, true);
+      start({ mode: "daily", day: dayKey(), ...difficultySettings() }, true);
       break;
     case "practice": {
       if (settings.mode === "practice") break;
@@ -439,14 +459,14 @@ function onClick(event) {
     case "help":
       dialog(
         "포케 하이로우 규칙",
-        `<ul class="rules"><li>${t("어느 포켓몬의 종족값이 더 높을까요?")}</li><li>${t("틀릴 때까지 도전이 계속됩니다.")}</li><li>${t("연습 모드를 통해 더 많은 퀴즈를 즐겨보세요!")}</li></ul><p class="dialog-copy">${t("데일리 문제의 출제 순서는 한국 시간 자정에 변경됩니다.")}</p>`,
+        `<ul class="rules"><li>${t("어느 포켓몬의 종족값이 더 높을까요?")}</li><li>${t("틀릴 때까지 도전이 계속됩니다.")}</li><li>${t("연습 모드를 통해 더 많은 퀴즈를 즐겨보세요!")}</li></ul><p class="dialog-copy">${t("하드 모드에서는 종족값 합계 차이가 {gap} 이하인 포켓몬끼리 대결해요.", { gap: HARD_MAX_GAP })}</p><p class="dialog-copy">${t("데일리 문제의 출제 순서는 한국 시간 자정에 변경됩니다.")}</p>`,
       );
       break;
     case "stats": {
       const list = records();
       dialog(
         "내 기록",
-        `<div class="stats-row"><div><strong>${best()}</strong><span>${t("내 최고")}</span></div><div><strong>${list.length}</strong><span>${t("완료한 도전")}</span></div></div><div class="history-list">${
+        `<p class="dialog-copy hl-record-mode">${difficultyName()}</p><div class="stats-row"><div><strong>${best()}</strong><span>${t("내 최고")}</span></div><div><strong>${list.length}</strong><span>${t("완료한 도전")}</span></div></div><div class="history-list">${
           list
             .slice(0, 10)
             .map(

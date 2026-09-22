@@ -448,8 +448,9 @@ test("old links cannot enable retired individual-stat play", async ({
     "?date=2026-09-11",
   ]) {
     await page.goto("./highlow.html" + query);
-    await expectPair(page, daily, 0);
-    await expect(page.locator("[data-difficulty]")).toHaveCount(0);
+    const settings = query.includes("=hard") ? { ...daily, difficulty: "hard" } : daily;
+    await expectPair(page, settings, 0);
+    await expect(page.locator("[data-difficulty]")).toHaveCount(2);
     await expect(page.locator("#hl-question")).toHaveText(
       "종족값 합계, 어느 쪽이 더 높을까?",
     );
@@ -457,6 +458,8 @@ test("old links cannot enable retired individual-stat play", async ({
   await win(page, daily, 0);
   await page.locator("#hl-next").click();
   await page.goto("./highlow.html?difficulty=hard");
+  await expectPair(page, { ...daily, difficulty: "hard" }, 0);
+  await page.locator('[data-difficulty="normal"]').click();
   await expectPair(page, daily, 1);
   await lose(page, daily, 1);
   await expect(page.locator(".hl-result-mode")).toHaveText("데일리");
@@ -532,7 +535,7 @@ test("old normal saves and records survive while retired records stay isolated",
       },
     },
   );
-  await page.goto("./highlow.html?difficulty=hard");
+  await page.goto("./highlow.html?difficulty=normal");
   await expectPair(page, daily, 2);
   await expect(page.locator("#hl-best")).toHaveText("6");
   await expect(page.locator("#hl-streak")).toHaveText("2");

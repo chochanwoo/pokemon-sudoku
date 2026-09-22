@@ -14,8 +14,19 @@
   font-size: 30px;
   line-height: 1.4;
 }
-.hl-mode button {
+.hl-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.hl-controls button {
   min-height: 40px;
+  white-space: nowrap;
+}
+.hl-difficulty button.active[data-difficulty="hard"] {
+  background: #a94f45;
+  color: #fff;
 }
 .hl-result-mode {
   margin-bottom: 12px;
@@ -478,11 +489,21 @@
   }
   .hl-heading {
     gap: 10px;
+    flex-wrap: wrap;
   }
   .hl-heading h1 {
     font-size: 24px;
   }
-  .hl-mode button {
+  .hl-controls {
+    width: 100%;
+    gap: 8px;
+  }
+  .hl-controls .segmented {
+    flex: 1;
+    min-width: 0;
+  }
+  .hl-controls button {
+    flex: 1;
     padding: 8px 10px;
     font-size: 12px;
   }

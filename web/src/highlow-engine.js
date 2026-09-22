@@ -12,14 +12,19 @@ const STAT_KEYS = [
   "speed",
 ];
 export const MAX_QUESTIONS = 1000;
+export const HARD_MAX_GAP = 50;
 export const TOTAL_STAT = {
   key: "bst",
   label: "종족값 합계",
   icon: "chart-no-axes-column",
 };
-// Keep the total-stat game's existing save keys and daily sequence.
-export const profileKey = (game) => `highlow:${game.version}:normal`;
-export const lastPracticeKey = () => "highlow:normal:last-practice";
+// Version the close-total mode separately from the retired individual-stat game.
+export const difficultyKey = (settings) =>
+  settings?.difficulty === "hard" ? "close-v1" : "normal";
+export const profileKey = (game, settings) =>
+  `highlow:${game.version}:${difficultyKey(settings)}`;
+export const lastPracticeKey = (settings) =>
+  `highlow:${difficultyKey(settings)}:last-practice`;
 export const validSeed = (seed) =>
   typeof seed === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(seed);
 export function settingsFromSearch(search, today = dayKey()) {
@@ -27,15 +32,17 @@ export function settingsFromSearch(search, today = dayKey()) {
   const practice =
     params.get("mode") === "practice" && validSeed(params.get("seed"));
   const date = params.get("date");
-  return practice
+  const settings = practice
     ? { mode: "practice", seed: params.get("seed") }
     : { mode: "daily", day: resolveDay(date, today) };
+  if (params.get("difficulty") === "hard") settings.difficulty = "hard";
+  return settings;
 }
 export function challengeKey(settings) {
   if (settings.mode === "daily" && validDay(settings.day))
-    return `normal:daily:${settings.day}`;
+    return `${difficultyKey(settings)}:daily:${settings.day}`;
   if (settings.mode === "practice" && validSeed(settings.seed))
-    return `normal:practice:${settings.seed}`;
+    return `${difficultyKey(settings)}:practice:${settings.seed}`;
   throw new Error("Invalid High Low challenge");
 }
 
@@ -85,6 +92,18 @@ export function createHighLow(catalog, bundle) {
     pokemon.some((b) => a.speciesId !== b.speciesId && a.bst !== b.bst),
   );
   if (!fallback) throw new Error("Not enough comparable Pokemon");
+  const closeOpponents = new Map(
+    pokemon.map((p) => [p.id, pokemon.filter((q) =>
+      p.speciesId !== q.speciesId && p.bst !== q.bst &&
+      Math.abs(p.bst - q.bst) <= HARD_MAX_GAP,
+    )]),
+  );
+  const closeBySpecies = new Map(
+    [...bySpecies].map(([id, forms]) => [
+      id, forms.filter((p) => closeOpponents.get(p.id).length),
+    ]).filter(([, forms]) => forms.length),
+  );
+  const closeSpecies = [...closeBySpecies.keys()];
   const version = `${bundle.version}:${bundle.dataVersion}`;
   function question(settings, index) {
     if (!Number.isInteger(index) || index < 0 || index >= MAX_QUESTIONS)
@@ -92,8 +111,13 @@ export function createHighLow(catalog, bundle) {
     const key = `${version}:${challengeKey(settings)}`;
     const rng = random(hash(`${key}:pair:${index}`));
     const pick = (list) => list[Math.floor(rng() * list.length)];
-    let left = pick(bySpecies.get(pick(species)));
-    let candidates = pokemon.filter(
+    const hard = settings.difficulty === "hard";
+    if (hard && !closeSpecies.length)
+      throw new Error("Not enough close-total Pokemon");
+    let left = hard
+      ? pick(closeBySpecies.get(pick(closeSpecies)))
+      : pick(bySpecies.get(pick(species)));
+    let candidates = hard ? closeOpponents.get(left.id) : pokemon.filter(
       (p) => p.speciesId !== left.speciesId && p.bst !== left.bst,
     );
     if (!candidates.length) {

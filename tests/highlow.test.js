@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   createHighLow,
   TOTAL_STAT,
+  HARD_MAX_GAP,
   profileKey,
   lastPracticeKey,
   MAX_QUESTIONS,
@@ -145,7 +146,9 @@ test("URL settings validate seeds, real dates, future dates and the Korean midni
     mode: "practice",
     seed: "a_-123",
   });
-  assert.deepEqual(settingsFromSearch("?difficulty=hard", today), settings);
+  assert.deepEqual(settingsFromSearch("?difficulty=hard", today), {
+    ...settings, difficulty: "hard",
+  });
   assert.deepEqual(
     settingsFromSearch("?difficulty=normal&date=2026-09-11", today),
     settings,
@@ -157,7 +160,7 @@ test("URL settings validate seeds, real dates, future dates and the Korean midni
   );
   assert.equal(
     Object.hasOwn(settingsFromSearch("?difficulty=hard"), "difficulty"),
-    false,
+    true,
   );
   assert.equal(dayKey(new Date("2026-09-11T14:59:59Z")), "2026-09-11");
   assert.equal(dayKey(new Date("2026-09-11T15:00:00Z")), "2026-09-12");
@@ -261,10 +264,80 @@ test("retired individual-stat saves never become total-stat progress", () => {
         search + "&difficulty=" + difficulty,
         "2026-09-11",
       );
-      assert.deepEqual(parsed, base);
+      assert.deepEqual(parsed, difficulty === "hard" ? { ...base, difficulty } : base);
       assert.equal(game.question(parsed, 0).stat, "bst");
     }
   }
+});
+
+test("hard pairs stay inside the total-stat gap, deterministic and balanced", () => {
+  const clone = createHighLow(catalog, bundle);
+  const eligible = new Set();
+  let leftWins = 0;
+  for (const base of [settings, { mode: "practice", seed: "close-totals" }]) {
+    const hard = { ...base, difficulty: "hard" };
+    assert.notEqual(storageKey(game, base), storageKey(game, hard));
+    assert.notEqual(profileKey(game, base), profileKey(game, hard));
+    assert.notEqual(lastPracticeKey(base), lastPracticeKey(hard));
+    assert.match(challengeKey(hard), /^close-v1:/);
+    for (let i = 0; i < MAX_QUESTIONS; i++) {
+      const q = game.question(hard, i);
+      const a = game.byId.get(q.left), b = game.byId.get(q.right);
+      const gap = Math.abs(a.bst - b.bst);
+      assert.ok(gap > 0 && gap <= HARD_MAX_GAP);
+      assert.notEqual(a.speciesId, b.speciesId);
+      assert.equal(q.stat, "bst");
+      assert.equal(q.winner, a.bst > b.bst ? "left" : "right");
+      assert.deepEqual(q, clone.question(hard, i));
+      eligible.add(a.speciesId);
+      if (q.winner === "left") leftWins++;
+    }
+  }
+  assert.ok(leftWins > 800 && leftWins < 1200);
+  assert.ok(eligible.size > 600);
+  assert.deepEqual(settingsFromSearch("?difficulty=hard&mode=practice&seed=close-totals"), {
+    mode: "practice", seed: "close-totals", difficulty: "hard",
+  });
+});
+
+test("hard saves restore wins and losses without accepting normal or retired progress", () => {
+  for (const base of [settings, { mode: "practice", seed: "save-hard" }]) {
+    const hard = { ...base, difficulty: "hard" };
+    const round = newRound(game, hard);
+    submitChoice(round, game, hard, game.question(hard, 0).winner);
+    assert.deepEqual(restoreRound(JSON.stringify(round), game, hard), round);
+    nextQuestion(round, game, hard);
+    assert.deepEqual(restoreRound(JSON.stringify(round), game, hard), round);
+    submitChoice(round, game, hard, opposite(game.question(hard, 1).winner));
+    assert.equal(score(round, game, hard), 1);
+    assert.ok(isEnded(round, game, hard));
+    assert.deepEqual(restoreRound(JSON.stringify(round), game, hard), round);
+    assert.deepEqual(restoreRound(JSON.stringify(round), game, base), newRound(game, base));
+    for (const prefix of ["normal:", "hard:", ""]) {
+      const old = { ...round, challenge: round.challenge.replace("close-v1:", prefix) };
+      assert.deepEqual(restoreRound(JSON.stringify(old), game, hard), newRound(game, hard));
+    }
+  }
+});
+
+test("hard sampling excludes isolated forms and includes the exact gap boundary", () => {
+  const pair = catalog.pokemon.filter((p) => [1, 4, 7].includes(p.id));
+  const make = (values) => createHighLow({ ...catalog, pokemon: pair }, {
+    ...bundle,
+    pokemon: pair.map((p, i) => ({ id: p.id, pokemonId: p.pokemonId,
+      speciesId: p.speciesId, stats: [values[i], 50, 50, 50, 50, 50] })),
+  });
+  const hard = { ...settings, difficulty: "hard" };
+  const g = make([50, 50 + HARD_MAX_GAP, 300]);
+  for (let i = 0; i < 100; i++) {
+    const q = g.question(hard, i);
+    assert.deepEqual([q.left, q.right].sort((a, b) => a - b), [1, 4]);
+  }
+  const isolated = make([50, 101, 300]);
+  assert.throws(() => isolated.question(hard, 0), /close-total/);
+  assert.doesNotThrow(() => isolated.question(settings, 0));
+  const tied = make([50, 50, 300]);
+  assert.throws(() => tied.question(hard, 0), /close-total/);
 });
 
 test("total-stat comparisons allow ties in individual stats but never total ties", () => {

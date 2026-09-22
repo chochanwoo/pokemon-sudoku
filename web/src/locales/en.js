@@ -1,5 +1,9 @@
 // Korean source messages are the default locale and the translation keys.
 export default {
+  일반: "Normal",
+  하드: "Hard",
+  "하드 모드에서는 종족값 합계 차이가 {gap} 이하인 포켓몬끼리 대결해요.":
+    "Hard mode pairs Pokemon whose base stat totals differ by no more than {gap}.",
   "바닷가 추리 테이블에 펼친 이브이, 샤미드, 쥬피썬더 사진":
     "Eevee, Vaporeon and Jolteon photos on a seaside detective's desk",
   "지우개 옆 그림판의 긁힌 틈으로 드러난 피카츄":
