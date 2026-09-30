@@ -27,11 +27,8 @@ const specialNames = {
 
 export function englishName(pokemon) {
   if (specialNames[pokemon.key]) return specialNames[pokemon.key];
-  // Form aliases retain the source's spelling, punctuation and form distinctions.
-  const alias = pokemon.aliases?.find(
-    (name) => /[A-Z]/.test(name) && !/[가-힣ㄱ-ㅎ]/.test(name),
-  );
-  if (alias) return alias;
+  // Search aliases can contain other languages or just a form label.
+  if (pokemon.english && /[A-Z]/.test(pokemon.english)) return pokemon.english;
   return (pokemon.english || pokemon.key).replace(
     /(^|[ -])([a-z])/g,
     (_, space, letter) => space + letter.toUpperCase(),

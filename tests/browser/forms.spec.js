@@ -19,6 +19,30 @@ const catalog = read("catalog"),
   forms = read("pokemantle");
 const byId = new Map(catalog.pokemon.map((p) => [p.id, p]));
 
+test("Silvally and other sparsely translated forms use English names in search and history", async ({ page }) => {
+  await page.goto("./pokemantle.html?date=2026-09-10");
+  await chooseLanguage(page, "en");
+  const input = page.locator("#guess-input");
+  await input.fill("Silvally");
+  await expect(page.locator("#guess-options [role=option]")).toHaveCount(18);
+  await expect(page.locator("#guess-options")).not.toContainText("Amigento");
+  await expect(page.locator('#guess-options [data-guess="773"]')).toContainText("Silvally Normal");
+  await expect(page.locator('#guess-options [data-guess="10232"]')).toContainText("Silvally Fighting");
+  await page.locator('#guess-options [data-guess="10232"]').click();
+  await expect(page.locator("#guess-history")).toContainText("Silvally Fighting");
+  await page.reload();
+  await expect(page.locator("#guess-history")).toContainText("Silvally Fighting");
+  for (const [query, id, name] of [["Castform", 351, "Castform"], ["Rotom", 479, "Rotom"],
+    ["Koraidon", 1007, "Koraidon"], ["Miraidon", 1008, "Miraidon"]]) {
+    await input.fill(query);
+    await expect(page.locator(`#guess-options [data-guess="${id}"] .pm-option-name`)).toHaveText(`${name}#${String(id).padStart(4, "0")}`);
+  }
+  await chooseLanguage(page, "ko");
+  await input.fill("실버디");
+  await expect(page.locator("#guess-options [role=option]")).toHaveCount(18);
+  await expect(page.locator("#guess-history")).toContainText("실버디");
+});
+
 test("Arceus has only 18 real types in search and revealed rankings in both languages", async ({
   page,
 }) => {

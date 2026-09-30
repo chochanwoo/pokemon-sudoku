@@ -94,8 +94,41 @@ test("every form has a distinct English name and only playable forms are searcha
     ["tauros-paldea-combat-breed", "Paldean Tauros (Combat Breed)"],
     ["type-null", "Type: Null"],
     ["farfetchd", "Farfetch'd"],
+    ["castform", "Castform"],
+    ["rotom", "Rotom"],
+    ["silvally-normal", "Silvally Normal"],
+    ["silvally-fighting", "Silvally Fighting"],
+    ["koraidon-apex-build", "Koraidon Apex Build"],
+    ["miraidon-ultimate-mode", "Miraidon Ultimate Mode"],
+    ["maushold-family-of-four", "Maushold (Family of Four)"],
+    ["oricorio-pom-pom", "Pom-pom Oricorio"],
+    ["kommo-o-totem", "Totem Kommo-o"],
   ])
     assert.equal(englishName(byKey.get(key)), name);
+});
+
+test("English display uses the explicit name, never a Latin-script search alias", () => {
+  assert.equal(englishName({
+    key: "silvally-normal", english: "silvally normal", aliases: ["Amigento"],
+  }), "Silvally Normal");
+  assert.equal(englishName({
+    key: "koraidon-apex-build", english: "koraidon apex build", aliases: ["Apex Build"],
+  }), "Koraidon Apex Build");
+  assert.equal(englishName({
+    key: "vulpix-alola", english: "Alolan Vulpix", aliases: ["Vulpix Alola"],
+  }), "Alolan Vulpix");
+});
+
+test("every Silvally type uses an English name and remains searchable in both languages", () => {
+  const forms = data.pokemon.filter((p) => p.speciesId === 773);
+  assert.equal(forms.length, 18);
+  for (const p of forms) {
+    assert.match(englishName(p), /^Silvally /);
+    assert.ok(!p.aliases.some((alias) => alias.includes("Amigento")), p.key);
+    for (const query of [englishName(p), p.name]) {
+      assert.ok(searchForms(data.pokemon, query).some((result) => result.id === p.id), query);
+    }
+  }
 });
 
 test("both games keep Korean and English search independent of selected language", () => {

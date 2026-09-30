@@ -212,7 +212,7 @@ def load_data():
         learnt, version, move_source = selected_moves.get(p["id"], (set(), None, "missing"))
         entries.append({"id": form["id"], "pokemonId": p["id"], "speciesId": s["id"],
                         "key": form["key"], "name": name, "baseName": s["name_ko"],
-                        "form": label, "english": form["key"].replace("-", " "),
+                        "form": label, "english": form["name_en"] if form["name_en"] != form["key"] else form["key"].replace("-", " "),
                         "aliases": list(filter(None, [form["name_ko"], form["name_en"],
                                         form["form_name_ko"], label + s["name_ko"]])),
                         "types": type_ids, "moveVersion": version, "moveSource": move_source,

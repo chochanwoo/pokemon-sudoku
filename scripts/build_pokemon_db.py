@@ -169,13 +169,12 @@ def localized_name(
 ) -> str:
     if not names:
         return fallback
-    for entry in names:
-        if entry.get("language", {}).get("name") == lang:
-            return entry.get("name", fallback)
-    for entry in names:
-        if entry.get("language", {}).get("name") == fallback_lang:
-            return entry.get("name", fallback)
-    return names[0].get("name", fallback)
+    for language in (lang, fallback_lang):
+        for entry in names:
+            if entry.get("language", {}).get("name") == language and entry.get("name"):
+                return entry["name"]
+    # Sparse translations must not leak an unrelated language into a named column.
+    return fallback
 
 
 def effect_entry(
